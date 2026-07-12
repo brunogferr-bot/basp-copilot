@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BASP Copilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Italiana&family=Jura:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0b09;--ivory:#f5f0e8;--gold:#d2af78;--gold-light:#e8d5a3;--gold-dark:#a8853a;
+  --glass-bg:rgba(245,240,232,0.04);--glass-hover:rgba(245,240,232,0.07);
+  --glass-border:rgba(210,175,120,0.18);--glass-border-strong:rgba(210,175,120,0.35);
+  --text-muted:rgba(245,240,232,0.58);--text-mid:rgba(245,240,232,0.9);
+  --military:#6b7a55;--urgent:#c23b3b;--radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ivory);font-family:'Jura',sans-serif;font-weight:500;min-height:100vh}
+#bg3d{position:fixed;inset:0;z-index:0}
+.screen{position:relative;z-index:1;min-height:100vh;display:none}
+.screen.on{display:block}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+
+/* ---------- LOGIN ---------- */
+.login-card{width:100%;max-width:380px;background:var(--glass-bg);border:0.5px solid var(--glass-border);
+  border-radius:14px;backdrop-filter:blur(18px);padding:38px 32px;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.login-logo{font-family:'Italiana',serif;font-size:34px;letter-spacing:.06em;margin:0 0 4px}
+.login-logo span{color:var(--gold)}
+.login-sub{font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--text-muted);margin:0 0 30px}
+.login-card input{width:100%;background:rgba(245,240,232,.05);border:0.5px solid var(--glass-border);
+  border-radius:8px;color:var(--ivory);font-family:'Jura';font-size:14px;padding:13px 14px;margin-bottom:12px;outline:none}
+.login-card input:focus{border-color:var(--gold)}
+.btn{width:100%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));border:none;border-radius:8px;
+  color:#16130f;font-family:'Jura';font-weight:700;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  padding:14px;cursor:pointer;transition:filter .2s}
+.btn:hover{filter:brightness(1.12)}
+.login-err{font-size:11px;color:#e08484;height:16px;margin:10px 0 0}
+.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
+/* ---------- SPLASH / LOGO 3D ---------- */
+.splash-logo{perspective:900px;text-align:center}
+.logo3d{font-family:'Italiana',serif;font-size:clamp(64px,14vw,150px);letter-spacing:.04em;margin:0;
+  background:linear-gradient(160deg,#f7e9c8 0%,var(--gold) 38%,var(--gold-dark) 60%,#f7e9c8 100%);
+  background-size:220% 220%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 1px 0 rgba(168,133,58,.55),0 2px 0 rgba(168,133,58,.42),0 3px 0 rgba(120,92,38,.34),
+   0 4px 0 rgba(90,68,26,.26),0 6px 2px rgba(0,0,0,.5),0 14px 34px rgba(210,175,120,.28);
+  animation:logoIn 1.4s cubic-bezier(.2,.9,.25,1.2) both,shine 3.2s linear infinite,float3d 5s ease-in-out infinite}
+@keyframes logoIn{0%{opacity:0;transform:rotateX(38deg) scale(.6) translateY(60px)}100%{opacity:1;transform:rotateX(8deg) scale(1) translateY(0)}}
+@keyframes shine{0%{background-position:0% 50%}100%{background-position:220% 50%}}
+@keyframes float3d{0%,100%{transform:rotateX(8deg) rotateY(-4deg)}50%{transform:rotateX(4deg) rotateY(4deg)}}
+.splash-sub{font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold-light);margin:22px 0 0;
+  opacity:0;animation:fadeUp .9s 1s both}
+.splash-ring{width:190px;height:3px;margin:26px auto 0;border-radius:3px;overflow:hidden;background:rgba(210,175,120,.14)}
+.splash-ring i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));animation:load 2.6s .4s ease both}
+@keyframes load{to{width:100%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ---------- HUB ---------- */
+.shell{max-width:1100px;margin:0 auto;padding:30px 20px 80px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:36px}
+.top-logo{font-family:'Italiana',serif;font-size:24px;letter-spacing:.06em}
+.top-logo span{color:var(--gold)}
+.top-right{display:flex;gap:16px;align-items:center}
+.date{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted)}
+.sair{background:none;border:0.5px solid var(--glass-border);border-radius:20px;color:var(--text-muted);
+  font-family:'Jura';font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:7px 14px;cursor:pointer}
+.hub-title{font-family:'Italiana',serif;font-size:clamp(26px,4vw,38px);text-align:center;margin:0 0 8px}
+.hub-sub{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);text-align:center;margin:0 0 44px}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.mod{position:relative;background:var(--glass-bg);border:0.5px solid var(--glass-border);border-radius:14px;
+  backdrop-filter:blur(18px);padding:26px 22px;cursor:pointer;transition:transform .35s,box-shadow .35s,border-color .35s}
+.mod:hover{transform:scale(1.035);border-color:var(--gold);
+  box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px var(--gold),0 0 40px rgba(210,175,120,.28)}
+.mod:hover::after,.mod:hover::before{content:"";position:absolute;border-radius:50%;pointer-events:none;
+  transform:translate(-50%,-50%);animation:trace 8s linear infinite}
+.mod:hover::after{width:6px;height:6px;z-index:8;background:radial-gradient(circle,#fffaf0 0%,var(--gold) 55%,transparent 80%);
+  box-shadow:0 0 6px 2px rgba(210,175,120,.5),0 0 16px 7px rgba(210,175,120,.2)}
+.mod:hover::before{width:30px;height:30px;z-index:7;filter:blur(2px);animation-delay:.15s;
+  background:radial-gradient(circle,rgba(210,175,120,.3) 0%,rgba(210,175,120,.1) 45%,transparent 85%)}
+@keyframes trace{0%{top:0;left:0}25%{top:0;left:100%}50%{top:100%;left:100%}75%{top:100%;left:0}100%{top:0;left:0}}
+.mod-ico{width:36px;height:36px;margin-bottom:14px;stroke:var(--gold-light);fill:none;stroke-width:1.4}
+.mod-name{font-family:'Italiana',serif;font-size:21px;margin:0 0 8px}
+.mod-desc{font-size:11.5px;line-height:1.6;color:var(--text-muted);margin:0 0 14px;min-height:52px}
+.tag{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;padding:4px 11px;border-radius:20px;display:inline-block}
+.t-on{border:.5px solid #a3b58a;color:#a3b58a}.t-build{border:.5px solid var(--gold);color:var(--gold-light)}
+.t-plan{border:.5px solid var(--glass-border-strong);color:var(--text-muted)}
+
+/* ---------- SUBTELAS ---------- */
+.back{background:none;border:none;color:var(--gold-light);font-family:'Jura';font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;cursor:pointer;padding:0;margin-bottom:26px;display:inline-flex;gap:8px;align-items:center}
+.mod-title{font-family:'Italiana',serif;font-size:clamp(24px,3.6vw,34px);margin:0 0 6px}
+.mod-tagline{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin:0 0 34px}
+.subgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:16px}
+.panel{background:var(--glass-bg);border:.5px solid var(--glass-border);border-radius:12px;backdrop-filter:blur(18px);padding:20px}
+.panel h4{font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:0 0 12px;font-weight:600}
+.panel p{font-size:12px;line-height:1.65;color:var(--text-muted);margin:0 0 14px}
+.mini-btn{display:inline-block;background:none;border:.5px solid var(--gold);border-radius:8px;color:var(--gold-light);
+  font-family:'Jura';font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;padding:10px 18px;cursor:pointer;text-decoration:none;transition:all .2s}
+.mini-btn:hover{background:rgba(210,175,120,.14)}
+.pulse{width:7px;height:7px;border-radius:50%;background:#a3b58a;display:inline-block;margin-right:7px;
+  animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(163,181,138,.5)}50%{box-shadow:0 0 0 6px rgba(163,181,138,0)}}
+.feed{list-style:none;padding:0;margin:0}
+.feed li{font-size:11.5px;line-height:1.55;color:var(--text-mid);padding:9px 0;border-bottom:.5px solid var(--glass-border)}
+.feed li:last-child{border:none}
+.feed b{color:var(--gold-light)}
+.score{float:right;font-size:10px;color:var(--gold)}
+
+/* ---------- EM CONSTRUÇÃO ---------- */
+.obra{text-align:center;padding-top:4vh}
+.obra h2{font-family:'Italiana',serif;font-size:clamp(28px,5vw,44px);margin:26px 0 8px}
+.obra p{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
+.obra small{font-size:11px;color:var(--text-muted)}
+.faixa{margin:34px auto 0;max-width:420px;height:16px;border-radius:8px;
+  background:repeating-linear-gradient(45deg,var(--gold-dark) 0 16px,#171310 16px 32px);
+  background-size:46px 46px;animation:faixa 1.4s linear infinite;border:.5px solid var(--glass-border-strong)}
+@keyframes faixa{to{background-position:46px 0}}
+/* animação da obra em SVG (guindaste + martelo + faíscas) */
+.braco{transform-origin:150px 96px;animation:braco 5s ease-in-out infinite}
+@keyframes braco{0%,100%{transform:rotate(0)}50%{transform:rotate(-9deg)}}
+.gancho{animation:gancho 5s ease-in-out infinite}
+@keyframes gancho{0%,100%{transform:translateY(0)}50%{transform:translateY(16px)}}
+.martelo{transform-origin:305px 176px;animation:martelo 0.85s ease-in-out infinite}
+@keyframes martelo{0%,100%{transform:rotate(16deg)}45%{transform:rotate(-34deg)}55%{transform:rotate(-34deg)}}
+.faisca{animation:faisca .85s linear infinite}
+@keyframes faisca{0%,70%{opacity:0}78%,92%{opacity:1}100%{opacity:0}}
+.luz{animation:luz 1.3s ease-in-out infinite}
+@keyframes luz{0%,100%{opacity:.25}50%{opacity:1}}
+</style>
+</head>
+<body>
+<canvas id="bg3d"></canvas>
+
+<!-- LOGIN -->
+<section class="screen on" id="sc-login">
+  <div class="center">
+    <div class="login-card" id="loginCard">
+      <p class="login-logo">BASP <span>COPILOT</span></p>
+      <p class="login-sub">Acesso restrito</p>
+      <input id="u" type="text" placeholder="Usuário" autocomplete="off">
+      <input id="p" type="password" placeholder="Senha">
+      <button class="btn" onclick="login()">Entrar</button>
+      <p class="login-err" id="err"></p>
+    </div>
+  </div>
+</section>
+
+<!-- SPLASH LOGO 3D -->
+<section class="screen" id="sc-splash">
+  <div class="center splash-logo">
+    <h1 class="logo3d">BASP</h1>
+    <p class="splash-sub">C O P I L O T</p>
+    <div class="splash-ring"><i></i></div>
+  </div>
+</section>
+
+<!-- HUB -->
+<section class="screen" id="sc-hub">
+  <div class="shell">
+    <div class="topbar">
+      <div class="top-logo">BASP <span>COPILOT</span></div>
+      <div class="top-right"><span class="date" id="hoje"></span><button class="sair" onclick="sair()">Sair</button></div>
+    </div>
+    <h1 class="hub-title">Bom trabalho, Bruno.</h1>
+    <p class="hub-sub">Seu copiloto de estrada · escolha um módulo</p>
+    <div class="mods">
+      <div class="mod" onclick="go('sc-mkt')">
+        <svg class="mod-ico" viewBox="0 0 24 24"><path d="M3 11l14-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+        <p class="mod-name">Marketing e Divulgação</p>
+        <p class="mod-desc">Criação de artes, publicação, fila e tráfego pago inteligente — o antigo BASP Studio evoluído.</p>
+        <span class="tag t-on">Ativo</span>
+      </div>
+      <div class="mod" onclick="obra('Rotas Inteligentes','Roteiro de visitas priorizado por cidade, com script por cliente e check-in de campo')">
+        <svg class="mod-ico" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.2-8 12-8 12S4 15.2 4 10a8 8 0 0 1 8-8z"/></svg>
+        <p class="mod-name">Rotas Inteligentes</p>
+        <p class="mod-desc">Em qual cliente focar, em que ordem, falando o quê — análise dos relatórios Mercos.</p>
+        <span class="tag t-build">Em construção</span>
+      </div>
+      <div class="mod" onclick="obra('Gestão Comercial','Painel das 15 fábricas, metas do ano e alerta de concentração de receita')">
+        <svg class="mod-ico" viewBox="0 0 24 24"><path d="M3 20h18M6 16V9m5 7V5m5 11v-6"/></svg>
+        <p class="mod-name">Gestão Comercial</p>
+        <p class="mod-desc">Desempenho por fábrica, metas, comparativos ano a ano e riscos da operação.</p>
+        <span class="tag t-plan">Planejado</span>
+      </div>
+      <div class="mod" onclick="obra('Financeiro','Conciliação de comissões, previsão de recebíveis e alerta legal do dia 15')">
+        <svg class="mod-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <p class="mod-name">Financeiro</p>
+        <p class="mod-desc">Quanto tem a receber, de quem, e quem está atrasando — com a lei do seu lado.</p>
+        <span class="tag t-plan">Planejado</span>
+      </div>
+      <div class="mod" onclick="obra('Jurídico','Direitos da Lei 4.886/65 em alertas acionáveis e geradores de documento')">
+        <svg class="mod-ico" viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>
+        <p class="mod-name">Jurídico</p>
+        <p class="mod-desc">Proteção do representante: comissões, contratos, indenização e registro CORE.</p>
+        <span class="tag t-plan">Planejado</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARKETING E DIVULGAÇÃO -->
+<section class="screen" id="sc-mkt">
+  <div class="shell">
+    <button class="back" onclick="go('sc-hub')">← Módulos</button>
+    <h2 class="mod-title">Marketing e Divulgação</h2>
+    <p class="mod-tagline">Criação · Publicação · Tráfego pago inteligente</p>
+    <div class="subgrid">
+      <div class="panel">
+        <h4>Estúdio de Criação</h4>
+        <p>O BASP Studio completo: Diretor de Arte, carrosséis, fila de publicação, analytics e fábricas. Abre na mesma pasta.</p>
+        <a class="mini-btn" href="basp-studio-v4_71.html">Abrir Estúdio</a>
+      </div>
+      <div class="panel">
+        <h4>Posts Automáticos · Radar Viral</h4>
+        <p><span class="pulse"></span>Pipeline ativo no Telegram: temas em alta às 7h, foto sua vira post com arte e aprovação por botão.</p>
+        <a class="mini-btn" href="https://basp-garimpo.onrender.com/api/garimpo/status" target="_blank">Status do motor</a>
+      </div>
+      <div class="panel">
+        <h4>Impulsionamento FFV</h4>
+        <p>Detecção automática de post com performance viral (FFV &gt; 1.5) e criação da campanha completa no Meta Ads com sua aprovação.</p>
+        <a class="mini-btn" href="basp-studio-v4_71.html">Ver no Estúdio</a>
+      </div>
+    </div>
+
+    <h2 class="mod-title" style="font-size:24px;margin-top:26px">BASP Ads Intelligence</h2>
+    <p class="mod-tagline">O que está funcionando AGORA no seu nicho — fontes reais, atualização diária</p>
+    <div class="subgrid">
+      <div class="panel">
+        <h4>Radar do dia · tendências</h4>
+        <ul class="feed">
+          <li><b>Sala de jantar "quiet luxury"</b> em alta no BR <span class="score">0.82</span></li>
+          <li><b>Madeira + boucle</b> dominando salvamentos <span class="score">0.77</span></li>
+          <li><b>Iluminação escultural</b> crescendo 3 semanas <span class="score">0.71</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Anúncios ativos no nicho</h4>
+        <p>Leitura da Biblioteca de Anúncios da Meta: quais criativos concorrentes de mobiliário premium estão rodando há mais tempo (anúncio antigo = anúncio que paga).</p>
+        <ul class="feed">
+          <li><b>Formato dominante:</b> Reels 9:16 com legenda queimada</li>
+          <li><b>Gancho recorrente:</b> preço ancorado em durabilidade</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Aprendizado dos seus posts</h4>
+        <p>Loop semanal já ativo: formato dominante, fadiga de conteúdo e FFV alimentam as próximas campanhas automaticamente.</p>
+        <ul class="feed">
+          <li><b>Seu formato campeão:</b> Carrossel (48%)</li>
+          <li><b>Melhor janela:</b> Ter–Qui · 19h–21h</li>
+        </ul>
+      </div>
+    </div>
+    <p style="font-size:10.5px;color:var(--text-muted);opacity:.75;margin-top:4px">Painéis com dados ilustrativos — conexões reais definidas na Fase Ads da arquitetura (Radar já ativo · Biblioteca de Anúncios Meta · Insights Graph API).</p>
+  </div>
+</section>
+
+<!-- EM CONSTRUÇÃO -->
+<section class="screen" id="sc-obra">
+  <div class="shell obra">
+    <button class="back" onclick="go('sc-hub')" style="float:left">← Módulos</button>
+    <div style="clear:both"></div>
+    <svg viewBox="0 0 460 250" width="min(92vw,430px)" height="auto" aria-label="Animação de obra: guindaste e operário trabalhando">
+      <!-- guindaste -->
+      <g stroke="#d2af78" stroke-width="2" fill="none">
+        <path d="M150 230 V96"/>
+        <path d="M138 230 h24"/>
+        <g class="braco">
+          <path d="M150 96 H268"/>
+          <path d="M150 96 L118 116 M150 96 l24 20 M198 96 l-24 20 M246 96 l-24 20"/>
+          <g class="gancho">
+            <path d="M252 96 v46"/>
+            <rect x="236" y="142" width="32" height="22" rx="2" fill="rgba(210,175,120,.14)"/>
+          </g>
+        </g>
+      </g>
+      <!-- operário -->
+      <g stroke="#e8d5a3" stroke-width="2.4" fill="none" stroke-linecap="round">
+        <circle cx="300" cy="164" r="8" fill="rgba(232,213,163,.15)"/>
+        <path d="M296 158 a9 9 0 0 1 14 2" stroke="#d2af78" stroke-width="3"/>
+        <path d="M300 172 v26 M300 182 l-12 8 M300 198 l-10 22 M300 198 l12 20"/>
+        <g class="martelo"><path d="M300 182 l16 -8"/><path d="M316 168 l10 4" stroke-width="5"/></g>
+      </g>
+      <!-- bigorna/viga + faíscas -->
+      <rect x="318" y="208" width="46" height="10" rx="2" fill="rgba(210,175,120,.25)"/>
+      <g class="faisca" fill="#f7e9c8">
+        <circle cx="330" cy="200" r="1.8"/><circle cx="340" cy="194" r="1.4"/><circle cx="323" cy="192" r="1.2"/>
+      </g>
+      <!-- luz de obra -->
+      <circle class="luz" cx="80" cy="210" r="5" fill="#c23b3b"/>
+      <path d="M80 215 v16 M68 231 h24" stroke="#d2af78" stroke-width="2"/>
+      <path d="M20 231 H440" stroke="rgba(210,175,120,.3)" stroke-width="2"/>
+    </svg>
+    <h2 id="obra-nome">Módulo</h2>
+    <p>Em construção</p>
+    <small id="obra-desc"></small>
+    <div class="faixa"></div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* NAVEGAÇÃO */
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');window.scrollTo(0,0);}
+function obra(nome,desc){document.getElementById('obra-nome').textContent=nome;
+  document.getElementById('obra-desc').textContent=desc;go('sc-obra');}
+function sair(){sessionStorage.removeItem('basp_auth');go('sc-login');}
+
+/* LOGIN (mesma credencial do Studio) */
+function login(){
+  const u=document.getElementById('u').value.trim(),p=document.getElementById('p').value;
+  if(u==='bruno'&&p==='basp2024'){sessionStorage.setItem('basp_auth','1');go('sc-splash');
+    setTimeout(()=>go('sc-hub'),3400);}
+  else{const c=document.getElementById('loginCard');c.classList.remove('shake');void c.offsetWidth;
+    c.classList.add('shake');document.getElementById('err').textContent='Usuário ou senha incorretos';}
+}
+document.getElementById('p').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+if(sessionStorage.getItem('basp_auth')==='1')go('sc-hub');
+document.getElementById('hoje').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+
+/* FUNDO 3D (partículas + anéis, leve) */
+(function(){
+  const cv=document.getElementById('bg3d');
+  const renderer=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:false});
+  renderer.setPixelRatio(1);
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(60,1,0.1,100);cam.position.z=14;
+  const N=340,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*34;pos[i*3+1]=(Math.random()-.5)*20;pos[i*3+2]=(Math.random()-.5)*16;}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({color:0xd2af78,size:0.055,transparent:true,opacity:0.72}));
+  scene.add(pts);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(6.5,0.012,8,140),
+    new THREE.MeshBasicMaterial({color:0xd2af78,transparent:true,opacity:0.26}));
+  ring.rotation.x=1.15;scene.add(ring);
+  const ring2=new THREE.Mesh(new THREE.TorusGeometry(8.4,0.008,8,160),
+    new THREE.MeshBasicMaterial({color:0xa8853a,transparent:true,opacity:0.15}));
+  ring2.rotation.x=1.35;ring2.rotation.y=0.4;scene.add(ring2);
+  function size(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}
+  size();addEventListener('resize',size);
+  let run=true;document.addEventListener('visibilitychange',()=>{run=!document.hidden;if(run)loop();});
+  function loop(){if(!run)return;pts.rotation.y+=0.00045;ring.rotation.z+=0.0012;ring2.rotation.z-=0.0008;
+    renderer.render(scene,cam);requestAnimationFrame(loop);}
+  loop();
+})();
+</script>
+</body>
+</html>
