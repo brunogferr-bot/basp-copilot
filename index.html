@@ -6,7 +6,7 @@
 <title>BASP Copilot</title>
 <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Jura:wght@300;400;500;600;700&family=Crimson+Pro:ital@0;1&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0d0b09;--ivory:#f5f0e8;--gold:#d2af78;--gold-light:#e8d5a3;--gold-dark:#a8853a;--glass:rgba(245,240,232,0.04);--gb:rgba(210,175,120,0.18);--gbs:rgba(210,175,120,0.35);--muted:rgba(245,240,232,0.58);--radius:10px}
+:root{--bg:#0d0b09;--ivory:#f5f0e8;--gold:#d2af78;--gold-light:#e8d5a3;--gold-dark:#a8853a;--glass:rgba(245,240,232,0.04);--gb:rgba(210,175,120,0.18);--gbs:rgba(210,175,120,0.35);--muted:rgba(245,240,232,0.58);--text-muted:rgba(245,240,232,0.45);--radius:10px}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{min-height:100%}
 body{background:var(--bg);color:var(--ivory);font-family:Jura,sans-serif;overflow-x:hidden}
@@ -22,31 +22,39 @@ body.has-bg-photo .ambient{display:none}
 @keyframes float{from{transform:translate(0,0) scale(1)}to{transform:translate(40px,-30px) scale(1.08)}}
 .screen{position:relative;z-index:1;min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:26px 20px}
 .screen.active{display:flex}
-.glass{background:var(--glass);border:1px solid var(--gb);border-radius:var(--radius);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.glass{background:var(--glass);border:0.5px solid var(--gb);border-radius:var(--radius);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 .brand{font-family:Italiana,serif;letter-spacing:.14em}
+
+/* ===== LOGIN — design do Studio ===== */
+#login{background:radial-gradient(ellipse at 30% 20%, rgba(210,175,120,0.08), transparent 50%),radial-gradient(ellipse at 80% 80%, rgba(200,169,110,0.06), transparent 50%),var(--bg)}
+body.has-bg-photo #login{background:radial-gradient(ellipse at 30% 20%, rgba(210,175,120,0.1), transparent 55%),radial-gradient(ellipse at 80% 80%, rgba(200,169,110,0.08), transparent 55%)}
+.login-card{width:380px;max-width:92vw;padding:48px 40px;border-radius:16px;background:rgba(245,240,232,0.035);border:0.5px solid var(--gb);backdrop-filter:blur(24px);box-shadow:0 30px 90px rgba(0,0,0,0.5);text-align:center}
+.brand-mark-lg{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:6px}
+.brand-icon-lg{width:64px;height:64px;object-fit:contain}
+.login-mark{font-family:Italiana,serif;font-weight:700;font-size:30px;letter-spacing:0.1em}
+.login-sub{font-size:9px;letter-spacing:0.3em;color:var(--gold);text-transform:uppercase;margin-bottom:36px}
+.login-field{margin-bottom:14px;text-align:left}
+.login-label{display:block;font-size:9px;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px}
+.login-input{width:100%;background:rgba(245,240,232,0.04);border:0.5px solid var(--gb);border-radius:8px;padding:12px 14px;color:var(--ivory);font-family:Jura,sans-serif;font-size:13px;outline:none;transition:border-color .2s;letter-spacing:0.04em}
+.login-input:focus{border-color:var(--gbs)}
+.login-btn{width:100%;margin-top:18px;padding:13px;border-radius:8px;border:0.5px solid var(--gold);background:rgba(210,175,120,0.12);color:var(--gold-light);font-family:Jura,sans-serif;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.login-btn:hover{background:rgba(210,175,120,0.2);border-color:var(--gold-light)}
+.login-error{font-size:11px;color:#e2837e;margin-top:12px;letter-spacing:0.04em;min-height:14px}
+.login-foot{font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-top:28px;text-transform:uppercase}
+
+/* ===== SPLASH — logo real ===== */
 #splash{background:transparent;perspective:900px}
 #splash-inner{display:flex;flex-direction:column;align-items:center;gap:22px}
-#splash-logo{width:min(52vw,280px);max-height:40vh;object-fit:contain;opacity:0;animation:bIn 2.5s cubic-bezier(.16,1,.3,1) .15s forwards;filter:drop-shadow(0 0 40px rgba(210,175,120,.35))}
-.logo-fallback{font-family:Italiana,serif;font-size:clamp(120px,30vw,220px);color:var(--gold);line-height:1;opacity:0;animation:bIn 2.5s cubic-bezier(.16,1,.3,1) .15s forwards;text-shadow:0 0 60px rgba(210,175,120,.45)}
+#splash-logo{width:min(48vw,240px);max-height:38vh;object-fit:contain;opacity:0;animation:bIn 2.5s cubic-bezier(.16,1,.3,1) .15s forwards;filter:drop-shadow(0 0 40px rgba(210,175,120,.35))}
 @keyframes bIn{0%{opacity:0;transform:translateZ(-1200px) scale(.04);filter:blur(16px)}55%{opacity:1}82%{transform:translateZ(0) scale(1.05);filter:blur(0)}100%{opacity:1;transform:translateZ(0) scale(1)}}
 #splash-word{font-family:Italiana,serif;font-size:clamp(26px,6vw,40px);letter-spacing:.5em;color:var(--ivory);opacity:0;animation:fadeUp 1s ease 1.6s forwards;padding-left:.5em}
 #splash-sub{font-size:13px;letter-spacing:.35em;color:var(--muted);text-transform:uppercase;opacity:0;animation:fadeUp 1s ease 2s forwards;padding-left:.35em}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-.login-card{width:min(92vw,400px);padding:44px 34px;display:flex;flex-direction:column;gap:18px;align-items:center}
-.login-logo{width:110px;max-height:110px;object-fit:contain;display:none}
-.login-fb{font-family:Italiana,serif;font-size:64px;color:var(--gold);line-height:1}
-.login-title{font-family:Italiana,serif;font-size:30px;letter-spacing:.18em;margin-top:4px}
-.login-sub{font-size:12px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
-.field{width:100%;background:rgba(13,11,9,.5);border:1px solid var(--gb);border-radius:var(--radius);color:var(--ivory);font-family:Jura,sans-serif;font-size:16px;padding:15px 16px;outline:none;transition:border .25s}
-.field:focus{border-color:var(--gbs)}
-.btn{cursor:pointer;border:1px solid var(--gbs);border-radius:var(--radius);background:linear-gradient(135deg,rgba(210,175,120,.16),rgba(210,175,120,.05));color:var(--gold-light);font-family:Jura,sans-serif;font-weight:600;letter-spacing:.12em;font-size:15px;padding:15px 26px;transition:all .3s;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:10px}
-.btn:hover{background:linear-gradient(135deg,rgba(210,175,120,.3),rgba(210,175,120,.1));transform:scale(1.035);box-shadow:0 8px 30px rgba(210,175,120,.18)}
-.btn-full{width:100%}
-.err{color:#e08b8b;font-size:13px;letter-spacing:.05em;min-height:16px}
+
+/* ===== HUB ===== */
 #hub{justify-content:flex-start;padding-top:34px}
 .hub-head{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:30px;text-align:center}
-.hub-logo{width:74px;max-height:74px;object-fit:contain;display:none;filter:drop-shadow(0 0 18px rgba(210,175,120,.3))}
-.hub-fb{font-family:Italiana,serif;font-size:52px;color:var(--gold);line-height:1}
+.hub-logo{width:74px;max-height:74px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(210,175,120,.3))}
 .hub-title{font-family:Italiana,serif;font-size:clamp(30px,7vw,44px);letter-spacing:.16em}
 .hub-sub{font-size:12px;letter-spacing:.34em;color:var(--muted);text-transform:uppercase}
 .mod-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px;width:min(1100px,94vw)}
@@ -74,39 +82,83 @@ body.has-bg-photo .ambient{display:none}
 .gear{width:120px;height:120px;color:var(--gold);opacity:.85}
 .gear svg{width:100%;height:100%;animation:spin 9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:600px){.mod-grid{grid-template-columns:1fr}.screen{padding:20px 14px}}
+.btn{cursor:pointer;border:1px solid var(--gbs);border-radius:var(--radius);background:linear-gradient(135deg,rgba(210,175,120,.16),rgba(210,175,120,.05));color:var(--gold-light);font-family:Jura,sans-serif;font-weight:600;letter-spacing:.12em;font-size:15px;padding:15px 26px;transition:all .3s;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.btn:hover{background:linear-gradient(135deg,rgba(210,175,120,.3),rgba(210,175,120,.1));transform:scale(1.035);box-shadow:0 8px 30px rgba(210,175,120,.18)}
+.btn-full{width:100%}
+
+/* ===== ROTAS INTELIGENTES ===== */
+#rotas{justify-content:flex-start;padding-top:30px}
+.rt-wrap{width:min(1100px,94vw);display:flex;flex-direction:column;gap:18px}
+.rt-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.rt-title{font-family:Italiana,serif;font-size:clamp(26px,5.5vw,36px);letter-spacing:.12em}
+.rt-sub{font-size:11px;letter-spacing:.24em;color:var(--muted);text-transform:uppercase;margin-top:4px}
+.rt-form{padding:20px;display:grid;grid-template-columns:1.3fr 1fr 0.9fr 1.1fr auto;gap:10px;align-items:end}
+.rt-field label{display:block;font-size:9px;letter-spacing:.2em;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px}
+.rt-input,.rt-select{width:100%;background:rgba(245,240,232,0.04);border:0.5px solid var(--gb);border-radius:8px;padding:11px 12px;color:var(--ivory);font-family:Jura,sans-serif;font-size:13px;outline:none}
+.rt-input:focus,.rt-select:focus{border-color:var(--gbs)}
+.rt-select option{background:#1a1611;color:var(--ivory)}
+.rt-add{padding:11px 20px;border-radius:8px;border:0.5px solid var(--gold);background:rgba(210,175,120,0.12);color:var(--gold-light);font-family:Jura,sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:all .2s;white-space:nowrap}
+.rt-add:hover{background:rgba(210,175,120,0.22)}
+.rt-week{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.rt-day{padding:14px;display:flex;flex-direction:column;gap:10px;min-height:150px}
+.rt-day-name{font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold-light);display:flex;justify-content:space-between;align-items:center}
+.rt-visit{background:rgba(13,11,9,.45);border:0.5px solid var(--gb);border-radius:8px;padding:10px;font-size:12px;line-height:1.45;position:relative}
+.rt-visit.alta{border-left:3px solid var(--gold)}
+.rt-visit b{color:var(--ivory);font-size:12.5px}
+.rt-visit .rt-city{color:var(--gold-light);font-size:11px;letter-spacing:.06em}
+.rt-visit .rt-obj{color:var(--muted);font-size:10.5px;margin-top:3px;font-style:italic}
+.rt-visit .rt-del{position:absolute;top:6px;right:8px;cursor:pointer;color:var(--muted);font-size:12px;background:none;border:none}
+.rt-visit .rt-del:hover{color:#e2837e}
+.rt-maps{margin-top:auto;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);cursor:pointer;background:none;border:0.5px solid var(--gb);border-radius:6px;padding:7px;transition:all .2s;text-align:center}
+.rt-maps:hover{border-color:var(--gold);background:rgba(210,175,120,.08)}
+.rt-tip{padding:16px 20px;font-size:13px;line-height:1.6;color:var(--muted)}
+.rt-tip b{color:var(--gold-light)}
+.rt-note{font-size:10px;letter-spacing:.12em;color:var(--text-muted);text-transform:uppercase;text-align:center}
+@media(max-width:900px){.rt-form{grid-template-columns:1fr 1fr}.rt-add{grid-column:1/-1}}
+@media(max-width:600px){.mod-grid{grid-template-columns:1fr}.screen{padding:20px 14px}.rt-form{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div id="app-bg"></div><div id="app-bg-overlay"></div>
 <div class="ambient"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
 
+<!-- LOGIN (design do Studio) -->
 <div id="login" class="screen active">
-  <div class="glass login-card">
-    <img class="login-logo logo-img" alt="BASP">
-    <div class="login-fb logo-fallback">B</div>
-    <div class="login-title brand">BASP COPILOT</div>
-    <div class="login-sub">Representa&ccedil;&otilde;es Premium</div>
-    <input id="f-user" class="field" type="text" placeholder="Usu&aacute;rio" autocomplete="username">
-    <input id="f-pass" class="field" type="password" placeholder="Senha" autocomplete="current-password">
-    <div id="login-err" class="err"></div>
-    <button id="btn-login" class="btn btn-full">Entrar</button>
+  <div class="login-card">
+    <div class="brand-mark-lg">
+      <img class="brand-icon-lg basp-logo" alt="BASP">
+      <div class="login-mark">BASP Copilot</div>
+    </div>
+    <div class="login-sub">Seu parceiro de neg&oacute;cios &middot; BASP Representa&ccedil;&otilde;es</div>
+    <form id="login-form" autocomplete="off">
+      <div class="login-field">
+        <label class="login-label">Usu&aacute;rio</label>
+        <input class="login-input" type="text" id="f-user" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Senha</label>
+        <input class="login-input" type="password" id="f-pass" autocomplete="current-password">
+      </div>
+      <button type="submit" class="login-btn">Entrar</button>
+      <div class="login-error" id="login-err"></div>
+    </form>
+    <div class="login-foot">BASP Representa&ccedil;&otilde;es</div>
   </div>
 </div>
 
+<!-- SPLASH (logo real) -->
 <div id="splash" class="screen">
   <div id="splash-inner">
-    <img id="splash-logo" class="logo-img" alt="B">
-    <div class="logo-fallback">B</div>
+    <img id="splash-logo" class="basp-logo" alt="BASP">
     <div id="splash-word" class="brand">BASP</div>
     <div id="splash-sub">Copilot</div>
   </div>
 </div>
 
+<!-- HUB -->
 <div id="hub" class="screen">
   <div class="hub-head">
-    <img class="hub-logo logo-img" alt="BASP">
-    <div class="hub-fb logo-fallback">B</div>
+    <img class="hub-logo basp-logo" alt="BASP">
     <div class="hub-title brand">BASP COPILOT</div>
     <div class="hub-sub">Seu parceiro de neg&oacute;cios</div>
   </div>
@@ -117,11 +169,11 @@ body.has-bg-photo .ambient{display:none}
       <div class="mod-desc">Est&uacute;dio de cria&ccedil;&atilde;o, posts autom&aacute;ticos e intelig&ecirc;ncia de an&uacute;ncios.</div>
       <div class="mod-tag">Ativo</div>
     </div>
-    <div class="glass mod" data-go="c-rotas">
+    <div class="glass mod" data-go="rotas">
       <div class="mod-ico"><svg viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="5" r="2.2"/><path d="M8 19h7a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h7"/></svg></div>
       <div class="mod-name">Rotas Inteligentes</div>
-      <div class="mod-desc">Planejamento de visitas com intelig&ecirc;ncia de vendas e metodologias consagradas.</div>
-      <div class="mod-tag soon">Em constru&ccedil;&atilde;o</div>
+      <div class="mod-desc">Planejamento semanal de visitas com metodologias consagradas e rota no mapa.</div>
+      <div class="mod-tag">Ativo</div>
     </div>
     <div class="glass mod" data-go="c-gestao">
       <div class="mod-ico"><svg viewBox="0 0 24 24"><path d="M4 20V9"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></div>
@@ -150,6 +202,7 @@ body.has-bg-photo .ambient{display:none}
   </div>
 </div>
 
+<!-- MARKETING -->
 <div id="marketing" class="screen">
   <div class="glass detail-card">
     <div class="detail-title brand">Marketing e Divulga&ccedil;&atilde;o</div>
@@ -165,42 +218,129 @@ body.has-bg-photo .ambient{display:none}
   </div>
 </div>
 
-<div id="c-rotas" class="screen construcao" data-nome="Rotas Inteligentes"></div>
+<!-- ROTAS INTELIGENTES -->
+<div id="rotas" class="screen">
+  <div class="rt-wrap">
+    <div class="rt-head">
+      <div>
+        <div class="rt-title brand">Rotas Inteligentes</div>
+        <div class="rt-sub">Planejamento semanal de visitas &middot; MG &middot; GO &middot; DF</div>
+      </div>
+      <button class="linklike" data-go="hub">&larr; Voltar aos m&oacute;dulos</button>
+    </div>
+
+    <div class="glass rt-form">
+      <div class="rt-field"><label>Cliente / Loja</label><input class="rt-input" id="rt-cliente" placeholder="Ex.: Casa Design"></div>
+      <div class="rt-field"><label>Cidade</label><input class="rt-input" id="rt-cidade" placeholder="Ex.: Uberl&acirc;ndia"></div>
+      <div class="rt-field"><label>Dia</label><select class="rt-select" id="rt-dia"><option>Segunda</option><option>Ter&ccedil;a</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>S&aacute;bado</option></select></div>
+      <div class="rt-field"><label>Objetivo</label><select class="rt-select" id="rt-obj"><option value="prospeccao">Prospec&ccedil;&atilde;o (novo cliente)</option><option value="reativacao">Reativa&ccedil;&atilde;o (sumido)</option><option value="negociacao">Negocia&ccedil;&atilde;o / fechamento</option><option value="relacionamento">Relacionamento</option><option value="apresentacao">Apresentar novidades</option><option value="posvenda">P&oacute;s-venda / entrega</option></select></div>
+      <button class="rt-add" id="rt-add">+ Agendar</button>
+    </div>
+
+    <div class="glass rt-tip" id="rt-tip"></div>
+
+    <div class="rt-week" id="rt-week"></div>
+
+    <div class="rt-note">Integra&ccedil;&atilde;o autom&aacute;tica Mercos &mdash; aguardando homologa&ccedil;&atilde;o &middot; Fase atual: planejamento manual</div>
+  </div>
+</div>
+
 <div id="c-gestao" class="screen construcao" data-nome="Gest&atilde;o Comercial"></div>
 <div id="c-financeiro" class="screen construcao" data-nome="Financeiro"></div>
 <div id="c-juridico" class="screen construcao" data-nome="Jur&iacute;dico"></div>
-<style>.logo-img{display:none}</style>
+
 <script>
 (function(){
-var LS_BG="basp_bg_image", LS_LOGO="basp_copilot_logo";
+var LS_BG="basp_bg_image", LS_BG_DEFAULT="basp_copilot_bg_default";
+var LOGO="data:image/png;base64,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";
 function $(id){return document.getElementById(id)}
 function show(id){var s=document.querySelectorAll(".screen");for(var i=0;i<s.length;i++){s[i].classList.remove("active")}$(id).classList.add("active");window.scrollTo(0,0)}
+
+/* logo real embutida em todas as marcas */
+var logos=document.querySelectorAll(".basp-logo");
+for(var i=0;i<logos.length;i++){logos[i].src=LOGO}
+
+/* telas em construcao */
 var gearSvg='<div class="gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg></div>';
 var cons=document.querySelectorAll(".construcao");
 for(var i=0;i<cons.length;i++){var nome=cons[i].getAttribute("data-nome");cons[i].innerHTML='<div class="glass detail-card">'+gearSvg+'<div class="detail-title brand">'+nome+'</div><div class="detail-sub">Em constru\u00e7\u00e3o \u2014 em breve no seu BASP Copilot.</div><button class="linklike" data-go="hub">\u2190 Voltar aos m\u00f3dulos</button></div>'}
-document.addEventListener("click",function(e){var el=e.target.closest("[data-go]");if(el){show(el.getAttribute("data-go"))}});
-function doLogin(){var u=$("f-user").value.trim().toLowerCase(),p=$("f-pass").value;if(u==="bruno"&&p==="basp2024"){sessionStorage.setItem("basp_copilot_auth","1");$("login-err").textContent="";runSplash()}else{$("login-err").textContent="Usu\u00e1rio ou senha incorretos."}}
-$("btn-login").addEventListener("click",doLogin);
-$("f-pass").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin()});
-$("f-user").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin()});
-$("btn-sair").addEventListener("click",function(){sessionStorage.removeItem("basp_copilot_auth");show("login")});
+document.addEventListener("click",function(e){var el=e.target.closest("[data-go]");if(el){show(el.getAttribute("data-go"));if(el.getAttribute("data-go")==="rotas"){rtRender()}}});
+
+/* ===== LOGIN UNICO (Copilot + Studio compartilham a sessao) ===== */
+function doLogin(e){if(e)e.preventDefault();var u=$("f-user").value.trim().toLowerCase(),p=$("f-pass").value;if(u==="bruno"&&p==="basp2024"){sessionStorage.setItem("basp_copilot_auth","1");sessionStorage.setItem("basp_auth","1");$("login-err").textContent="";runSplash()}else{$("login-err").textContent="Usu\u00e1rio ou senha incorretos."}}
+$("login-form").addEventListener("submit",doLogin);
+$("btn-sair").addEventListener("click",function(){sessionStorage.removeItem("basp_copilot_auth");sessionStorage.removeItem("basp_auth");show("login")});
 function runSplash(){show("splash");setTimeout(function(){show("hub")},3200)}
-var defaultBg=null;
-function applyBg(){var data=null;try{data=localStorage.getItem(LS_BG)}catch(e){}if(!data)data=defaultBg;var bg=$("app-bg");if(data){bg.style.backgroundImage="url("+data+")";document.body.classList.add("has-bg-photo")}else{bg.style.backgroundImage="";document.body.classList.remove("has-bg-photo")}}
+
+/* ===== FUNDO (foto do Studio em todas as telas) ===== */
+function applyBg(data){var bg=$("app-bg");if(data){bg.style.backgroundImage="url("+data+")";document.body.classList.add("has-bg-photo")}else{bg.style.backgroundImage="";document.body.classList.remove("has-bg-photo")}}
 function extract(t,name){var i=t.indexOf(name);if(i<0)return null;var j=t.indexOf("=",i);if(j<0)return null;j++;while(j<t.length&&t.charAt(j)===" "){j++}var q=t.charAt(j);if(q!=='"'&&q!=="'")return null;var k=t.indexOf(q,j+1);if(k<0)return null;return t.substring(j+1,k)}
-function setLogos(logo){if(!logo)return;var imgs=document.querySelectorAll(".logo-img");for(var i=0;i<imgs.length;i++){imgs[i].src=logo;imgs[i].style.display="block"}var fbs=document.querySelectorAll(".logo-fallback");for(var j=0;j<fbs.length;j++){fbs[j].style.display="none"}}
-async function loadAssets(){var logo=null;try{logo=localStorage.getItem(LS_LOGO)}catch(e){}
-if(logo){setLogos(logo)}
-var precisaBg=true;try{precisaBg=!localStorage.getItem(LS_BG)}catch(e){}
-if(!logo||precisaBg){try{var r=await fetch("basp-studio-v4_72.html");var t=await r.text();
-if(!logo){logo=extract(t,"BASP_LOGO_DATA");if(logo){setLogos(logo);try{localStorage.setItem(LS_LOGO,logo)}catch(e){}}}
-if(precisaBg){defaultBg=extract(t,"DEFAULT_BG_IMAGE")}
-}catch(e){}}
-applyBg()}
+async function loadBg(){
+  var custom=null;try{custom=localStorage.getItem(LS_BG)}catch(e){}
+  if(custom){applyBg(custom);return}
+  var cached=null;try{cached=localStorage.getItem(LS_BG_DEFAULT)}catch(e){}
+  if(cached){applyBg(cached);return}
+  try{var r=await fetch("basp-studio-v4_72.html");var t=await r.text();var d=extract(t,"DEFAULT_BG_IMAGE");if(d){applyBg(d);try{localStorage.setItem(LS_BG_DEFAULT,d)}catch(e){}}}catch(e){}
+}
 $("bg-add").addEventListener("click",function(){$("bg-file").click()});
-$("bg-file").addEventListener("change",function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{localStorage.setItem(LS_BG,rd.result)}catch(e){alert("Imagem muito grande. Escolha uma menor.");return}applyBg()};rd.readAsDataURL(f)});
-$("bg-remove").addEventListener("click",function(){try{localStorage.removeItem(LS_BG)}catch(e){}applyBg()});
-loadAssets();
+$("bg-file").addEventListener("change",function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{localStorage.setItem(LS_BG,rd.result)}catch(e){alert("Imagem muito grande. Escolha uma menor.");return}applyBg(rd.result)};rd.readAsDataURL(f)});
+$("bg-remove").addEventListener("click",function(){try{localStorage.removeItem(LS_BG)}catch(e){}loadBg()});
+
+/* ===== ROTAS INTELIGENTES v1 ===== */
+var RT_KEY="basp_rotas_visitas";
+var DIAS=["Segunda","Ter\u00e7a","Quarta","Quinta","Sexta","S\u00e1bado"];
+var METODOS={
+  prospeccao:{tag:"SPIN Selling",dica:"<b>Prospec\u00e7\u00e3o \u00b7 SPIN Selling:</b> n\u00e3o abra falando das f\u00e1bricas. Abra com perguntas de Situa\u00e7\u00e3o e Problema: \u201cComo est\u00e1 a procura por m\u00f3veis de alto padr\u00e3o aqui na regi\u00e3o? O que mais falta nos fornecedores atuais?\u201d Deixe o cliente nomear a dor antes de apresentar a solu\u00e7\u00e3o."},
+  reativacao:{tag:"Receita Previs\u00edvel",dica:"<b>Reativa\u00e7\u00e3o \u00b7 Receita Previs\u00edvel:</b> cliente sumido \u00e9 pipeline dormindo. Chegue com um motivo novo e concreto (tabela nova, lan\u00e7amento, condi\u00e7\u00e3o especial) \u2014 nunca com cobran\u00e7a. \u201cPassei para te mostrar o que chegou de novo\u201d reabre a porta sem constrangimento."},
+  negociacao:{tag:"Cialdini",dica:"<b>Negocia\u00e7\u00e3o \u00b7 Cialdini:</b> use escassez e prova social com verdade: prazo real da condi\u00e7\u00e3o, cases de lojas da regi\u00e3o que est\u00e3o vendendo bem a linha. Reciprocidade antes do pedido: leve algo de valor (an\u00e1lise, sugest\u00e3o de vitrine) antes de pedir o fechamento."},
+  relacionamento:{tag:"Carnegie",dica:"<b>Relacionamento \u00b7 Dale Carnegie:</b> a visita \u00e9 sobre a pessoa, n\u00e3o sobre o pedido. Lembre nomes, filhos, hist\u00f3rias da loja. Fa\u00e7a perguntas genu\u00ednas e escute 70% do tempo. Quem se sente importante compra de quem o fez se sentir assim."},
+  apresentacao:{tag:"Kotler",dica:"<b>Apresenta\u00e7\u00e3o \u00b7 Kotler:</b> n\u00e3o venda o m\u00f3vel, venda o posicionamento: o que essa linha faz pela imagem da loja e pelo t\u00edquete m\u00e9dio dela. Mostre a novidade conectada ao p\u00fablico da loja \u2014 \u201cisso aqui \u00e9 para aquele seu cliente arquiteto\u201d."},
+  posvenda:{tag:"Gitomer",dica:"<b>P\u00f3s-venda \u00b7 Gitomer:</b> a venda come\u00e7a depois da entrega. Confira a montagem, tire foto do produto exposto (vira conte\u00fado para o Studio!), pergunte o que o cliente final achou. Cliente bem atendido no p\u00f3s \u00e9 quem te indica \u2014 pe\u00e7a a indica\u00e7\u00e3o na hora certa."}
+};
+function rtLoad(){try{return JSON.parse(localStorage.getItem(RT_KEY)||"[]")}catch(e){return[]}}
+function rtSave(v){try{localStorage.setItem(RT_KEY,JSON.stringify(v))}catch(e){}}
+function rtRender(){
+  var visitas=rtLoad();var week=$("rt-week");week.innerHTML="";
+  DIAS.forEach(function(dia){
+    var doDia=visitas.filter(function(v){return v.dia===dia});
+    var col=document.createElement("div");col.className="glass rt-day";
+    var h='<div class="rt-day-name"><span>'+dia+'</span><span style="color:var(--muted)">'+doDia.length+'</span></div>';
+    doDia.forEach(function(v){
+      var alta=(v.obj==="reativacao"||v.obj==="negociacao");
+      h+='<div class="rt-visit'+(alta?' alta':'')+'"><button class="rt-del" data-id="'+v.id+'">\u00d7</button><b>'+v.cliente+'</b><div class="rt-city">'+v.cidade+'</div><div class="rt-obj">'+METODOS[v.obj].tag+(alta?' \u00b7 prioridade':'')+'</div></div>';
+    });
+    if(doDia.length>1){h+='<button class="rt-maps" data-dia="'+dia+'">\ud83d\uddfa Tra\u00e7ar rota ('+doDia.length+' paradas)</button>'}
+    else if(doDia.length===1){h+='<button class="rt-maps" data-dia="'+dia+'">\ud83d\uddfa Abrir no mapa</button>'}
+    col.innerHTML=h;week.appendChild(col);
+  });
+}
+$("rt-add").addEventListener("click",function(){
+  var c=$("rt-cliente").value.trim(),cid=$("rt-cidade").value.trim(),dia=$("rt-dia").value,obj=$("rt-obj").value;
+  if(!c||!cid){alert("Preencha cliente e cidade.");return}
+  var visitas=rtLoad();visitas.push({id:Date.now(),cliente:c,cidade:cid,dia:dia,obj:obj});rtSave(visitas);
+  $("rt-cliente").value="";$("rt-cidade").value="";
+  $("rt-tip").innerHTML=METODOS[obj].dica;
+  rtRender();
+});
+$("rt-obj").addEventListener("change",function(){$("rt-tip").innerHTML=METODOS[this.value].dica});
+$("rt-week").addEventListener("click",function(e){
+  if(e.target.classList.contains("rt-del")){
+    var id=Number(e.target.getAttribute("data-id"));
+    rtSave(rtLoad().filter(function(v){return v.id!==id}));rtRender();return;
+  }
+  var mp=e.target.closest(".rt-maps");
+  if(mp){
+    var dia=mp.getAttribute("data-dia");
+    var cidades=rtLoad().filter(function(v){return v.dia===dia}).map(function(v){return encodeURIComponent(v.cliente+", "+v.cidade)});
+    if(!cidades.length)return;
+    var url="https://www.google.com/maps/dir/"+["Minha+localiza\u00e7\u00e3o"].concat(cidades).join("/");
+    window.open(url,"_blank");
+  }
+});
+$("rt-tip").innerHTML=METODOS["prospeccao"].dica;
+
+/* boot */
+loadBg();
 if(sessionStorage.getItem("basp_copilot_auth")==="1"){runSplash()}else{show("login")}
 })();
 </script>
