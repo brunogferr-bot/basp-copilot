@@ -154,7 +154,7 @@ body.has-bg-photo .ambient{display:none}
   <div class="glass detail-card">
     <div class="detail-title brand">Marketing e Divulga&ccedil;&atilde;o</div>
     <div class="detail-sub">Crie artes de luxo, publique nas redes e acompanhe o que funciona no seu mercado.</div>
-    <a class="btn btn-full" href="basp-studio-v4_71.html">Abrir Est&uacute;dio &rarr;</a>
+    <a class="btn btn-full" href="basp-studio-v4_72.html">Abrir Est&uacute;dio &rarr;</a>
     <div class="ads-box">
       <div class="ads-title">BASP Ads Intelligence</div>
       <div class="src"><span class="dot"></span> Radar Viral &mdash; tend&ecirc;ncias do seu nicho todo dia &agrave;s 07:00</div>
@@ -177,9 +177,9 @@ function $(id){return document.getElementById(id)}
 function show(id){var s=document.querySelectorAll(".screen");for(var i=0;i<s.length;i++){s[i].classList.remove("active")}$(id).classList.add("active");window.scrollTo(0,0)}
 var gearSvg='<div class="gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg></div>';
 var cons=document.querySelectorAll(".construcao");
-for(var i=0;i<cons.length;i++){var nome=cons[i].getAttribute("data-nome");cons[i].innerHTML='<div class="glass detail-card">'+gearSvg+'<div class="detail-title brand">'+nome+'</div><div class="detail-sub">Em construção — em breve no seu BASP Copilot.</div><button class="linklike" data-go="hub">← Voltar aos módulos</button></div>'}
+for(var i=0;i<cons.length;i++){var nome=cons[i].getAttribute("data-nome");cons[i].innerHTML='<div class="glass detail-card">'+gearSvg+'<div class="detail-title brand">'+nome+'</div><div class="detail-sub">Em constru\u00e7\u00e3o \u2014 em breve no seu BASP Copilot.</div><button class="linklike" data-go="hub">\u2190 Voltar aos m\u00f3dulos</button></div>'}
 document.addEventListener("click",function(e){var el=e.target.closest("[data-go]");if(el){show(el.getAttribute("data-go"))}});
-function doLogin(){var u=$("f-user").value.trim().toLowerCase(),p=$("f-pass").value;if(u==="bruno"&&p==="basp2024"){sessionStorage.setItem("basp_copilot_auth","1");$("login-err").textContent="";runSplash()}else{$("login-err").textContent="Usuário ou senha incorretos."}}
+function doLogin(){var u=$("f-user").value.trim().toLowerCase(),p=$("f-pass").value;if(u==="bruno"&&p==="basp2024"){sessionStorage.setItem("basp_copilot_auth","1");$("login-err").textContent="";runSplash()}else{$("login-err").textContent="Usu\u00e1rio ou senha incorretos."}}
 $("btn-login").addEventListener("click",doLogin);
 $("f-pass").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin()});
 $("f-user").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin()});
@@ -192,7 +192,7 @@ function setLogos(logo){if(!logo)return;var imgs=document.querySelectorAll(".log
 async function loadAssets(){var logo=null;try{logo=localStorage.getItem(LS_LOGO)}catch(e){}
 if(logo){setLogos(logo)}
 var precisaBg=true;try{precisaBg=!localStorage.getItem(LS_BG)}catch(e){}
-if(!logo||precisaBg){try{var r=await fetch("basp-studio-v4_71.html");var t=await r.text();
+if(!logo||precisaBg){try{var r=await fetch("basp-studio-v4_72.html");var t=await r.text();
 if(!logo){logo=extract(t,"BASP_LOGO_DATA");if(logo){setLogos(logo);try{localStorage.setItem(LS_LOGO,logo)}catch(e){}}}
 if(precisaBg){defaultBg=extract(t,"DEFAULT_BG_IMAGE")}
 }catch(e){}}
