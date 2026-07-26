@@ -2,6 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#a8853a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rotas BASP">
 <title>BASP Rotas Inteligentes</title>
 <style>
   :root {
@@ -214,6 +220,62 @@
   .spinner-big {
     width:34px; height:34px; border-radius:50%; border:3px solid var(--border);
     border-top-color: var(--gold); margin: 0 auto 16px; animation: spin 0.8s linear infinite;
+  }
+
+  /* ===== ACOES DE CAMPO (celular) ===== */
+  .field-actions {
+    display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .field-btn {
+    flex: 1 1 0; min-width: 92px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 10px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+    text-decoration: none; border: 1px solid var(--border); background: var(--card);
+    color: var(--ink); cursor: pointer; font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .field-btn:active { transform: scale(0.97); }
+  .field-btn.call { border-color: #b7d2b9; color: #1f6b25; background: #f1f8f1; }
+  .field-btn.zap  { border-color: #a9dcb8; color: #0e6b3c; background: #eefaf2; }
+  .field-btn.map  { border-color: #b3c8e0; color: #1a4f80; background: #eef4fa; }
+  .field-btn.off  { opacity: 0.4; pointer-events: none; }
+
+  /* ===== CELULAR ===== */
+  @media (max-width: 720px) {
+    #app { padding: 14px 12px 80px; }
+    h1 { font-size: 21px; }
+    .subtitle { font-size: 13.5px; }
+    .topbar { flex-wrap: wrap; gap: 10px; }
+    .stats-strip { gap: 7px; margin-bottom: 14px; }
+    .stat-chip { padding: 5px 11px; font-size: 12px; }
+
+    /* alvos de toque maiores */
+    .btn { padding: 10px 13px; font-size: 13.5px; }
+    .btn-sm { padding: 7px 11px; font-size: 12.5px; }
+    .card-actions { gap: 7px; }
+    .card-actions .btn { flex: 1 1 46%; justify-content: center; text-align: center; }
+
+    /* nao deixar o iPhone dar zoom ao focar num campo: precisa de 16px */
+    input, select, textarea, .search-box,
+    .settings-panel input, .center-screen input { font-size: 16px !important; }
+
+    .client-card { padding: 14px 13px; }
+    .client-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .client-name { font-size: 15.5px; line-height: 1.35; }
+    .metrics-row { flex-direction: column; gap: 4px; font-size: 12.5px; }
+    .ranking-line { font-size: 12.5px; }
+    .form-row { flex-direction: column; gap: 10px; }
+    .form-row > div { min-width: 0 !important; width: 100%; }
+    .city-card { padding: 14px 13px; }
+    .search-box { padding: 12px 14px; }
+    .backbar { position: sticky; top: 0; z-index: 5; background: var(--bg);
+               padding: 8px 0; margin: 0 0 8px; }
+    .back-btn { padding: 9px 14px; font-size: 13.5px; }
+  }
+
+  @media (max-width: 400px) {
+    .field-btn { font-size: 12.5px; padding: 10px 6px; min-width: 78px; }
+    .card-actions .btn { flex: 1 1 100%; }
   }
 </style>
 </head>
@@ -517,6 +579,51 @@ function renderCity(cdk) {
   `;
 }
 
+/* ===== Acoes de campo: ligar, WhatsApp e rota ===== */
+
+/** Pega o primeiro telefone utilizavel do campo do Mercos (que vem baguncado). */
+function primeiroTelefone(tel) {
+  if (!tel) return null;
+  // o Mercos junta varios numeros e nomes na mesma string
+  const achados = String(tel).match(/\(?\d{2}\)?[\s.-]?\d{4,5}[\s.-]?\d{4}/g);
+  if (!achados || !achados.length) return null;
+  return achados[0].replace(/\D/g, '');
+}
+
+/** Escolhe um celular (9 digitos apos o DDD) se existir; senao o primeiro numero. */
+function telefoneWhats(tel) {
+  if (!tel) return null;
+  const achados = String(tel).match(/\(?\d{2}\)?[\s.-]?\d{4,5}[\s.-]?\d{4}/g) || [];
+  const limpos = achados.map(t => t.replace(/\D/g, '')).filter(t => t.length >= 10);
+  const celular = limpos.find(t => t.length === 11);
+  const escolhido = celular || limpos[0];
+  return escolhido ? '55' + escolhido : null;
+}
+
+function renderFieldActions(entity) {
+  const tel = primeiroTelefone(entity.tel);
+  const zap = telefoneWhats(entity.tel);
+  // bairro e CEP fazem muita diferenca em cidade de quadra/lote (Goiania)
+  const endereco = [entity.end, entity.bairro, entity.cd, entity.uf, entity.cep]
+    .filter(function (x) { return x && String(x).trim(); })
+    .join(', ');
+  const mapsUrl = endereco
+    ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(endereco)
+    : null;
+
+  return `<div class="field-actions">
+    ${tel
+      ? `<a class="field-btn call" href="tel:${tel}">📞 Ligar</a>`
+      : `<span class="field-btn call off">📞 Sem telefone</span>`}
+    ${zap
+      ? `<a class="field-btn zap" href="https://wa.me/${zap}" target="_blank" rel="noopener">💬 WhatsApp</a>`
+      : `<span class="field-btn zap off">💬 WhatsApp</span>`}
+    ${mapsUrl
+      ? `<a class="field-btn map" href="${mapsUrl}" target="_blank" rel="noopener">🧭 Rota</a>`
+      : `<span class="field-btn map off">🧭 Sem endereço</span>`}
+  </div>`;
+}
+
 function renderCard(entity) {
   const key = entity.logId;
   const encKey = encodeURIComponent(key);
@@ -556,6 +663,7 @@ function renderCard(entity) {
       &nbsp;·&nbsp; ${valorTotal > 0 ? fmtMoney(valorTotal) : 'sem valor conhecido'}
       <br><small>Baseado no valor do último pedido do Mercos + pedidos registrados aqui no app.</small>
     </div>
+    ${renderFieldActions(entity)}
     <div class="showroom-line">${sr.text}</div>
     ${pend.map(p => `<div class="pendencia-box">
         <span>⚠️ ${p.pendencia}</span>
