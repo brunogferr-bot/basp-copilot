@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>BASP Rotas Inteligentes</title>
+<style>
+  :root {
+    color-scheme: light;
+    --gold: #a8853a;
+    --gold-light: #d2af78;
+    --ink: #241f18;
+    --ink-soft: #55503f;
+    --bg: #f7f2e8;
+    --card: #fffdf8;
+    --border: #e3d6b6;
+    --urgente: #b3261e;
+    --urgente-bg: #fdecea;
+    --atencao: #9a6300;
+    --atencao-bg: #fff4dc;
+    --emdia: #2e7d32;
+    --emdia-bg: #eaf6ea;
+    --semhist: #6b6b6b;
+    --semhist-bg: #f0f0ee;
+    --inativo: #8a8a8a;
+    --inativo-bg: #ececec;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .display-font { font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; }
+  #app { max-width: 940px; margin: 0 auto; padding: 20px 16px 60px; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .brand { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .brand small { display:block; color: var(--ink-soft); letter-spacing: 0.02em; text-transform: none; font-size: 11px; margin-top:2px; }
+  .stats-strip {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .stat-chip {
+    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 14px; font-size: 12.5px; color: var(--ink-soft);
+  }
+  .stat-chip b { color: var(--ink); }
+  h1 {
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    font-size: 25px; margin: 10px 0 4px; font-weight: 600; letter-spacing: 0.01em;
+    position: relative; padding-bottom: 10px;
+  }
+  h1::after {
+    content: ''; position: absolute; left: 0; bottom: 0; width: 46px; height: 2px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  }
+  .subtitle { color: var(--ink-soft); font-size: 14px; margin-bottom: 18px; }
+  .search-box {
+    width: 100%; padding: 13px 16px; font-size: 15px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--card); margin-bottom: 14px;
+  }
+  .city-list { display: flex; flex-direction: column; gap: 8px; }
+  .city-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; cursor: pointer; transition: border-color .15s;
+  }
+  .city-row:hover { border-color: var(--gold-light); }
+  .city-row .name { font-weight: 600; font-size: 14.5px; }
+  .city-row .uf { color: var(--ink-soft); font-weight: 400; font-size: 13px; margin-left: 6px;}
+  .city-row .meta { display:flex; gap:8px; align-items:center; flex-wrap: wrap; justify-content: flex-end; }
+  .badge { display:inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space:nowrap; }
+  .badge-urgente { color: var(--urgente); background: var(--urgente-bg); }
+  .badge-atencao { color: var(--atencao); background: var(--atencao-bg); }
+  .badge-emdia { color: var(--emdia); background: var(--emdia-bg); }
+  .badge-semhist { color: var(--semhist); background: var(--semhist-bg); }
+  .badge-inativo { color: var(--inativo); background: var(--inativo-bg); }
+  .badge-count { color: var(--ink-soft); background: #f2ede0; }
+  .badge-group { color: #6b5322; background: #f6f2e6; border: 1px solid #ecdfc0; }
+  .last-city-btn {
+    display:inline-block; margin-bottom: 16px; padding: 9px 16px; border-radius: 999px;
+    border: 1px solid var(--gold-light); color: var(--gold); background: #fbf5e9; font-size: 13px;
+    cursor: pointer; font-weight: 600;
+  }
+  .backbar { display:flex; align-items:center; gap:10px; margin-bottom: 6px; }
+  .back-btn {
+    border: none; background: none; color: var(--gold); cursor: pointer; font-size: 14px;
+    font-weight: 700; padding: 6px 0;
+  }
+  .client-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(168,133,58,0.08);
+  }
+  .client-card.is-inactive { opacity: 0.6; }
+  .client-head { display:flex; justify-content: space-between; gap: 10px; align-items:flex-start; flex-wrap: wrap;}
+  .client-name { font-weight: 700; font-size: 16px; font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; }
+  .client-sub { color: var(--ink-soft); font-size: 12.5px; margin-top: 2px; }
+  .client-sub a { color: var(--ink-soft); }
+  .badges-row { display:flex; gap:6px; flex-wrap: wrap; }
+  .metrics-row {
+    display:flex; gap: 16px; margin: 10px 0; font-size: 12.5px; color: var(--ink-soft); flex-wrap: wrap;
+  }
+  .metrics-row b { color: var(--ink); }
+  .ranking-line {
+    font-size: 12.5px; padding: 7px 10px; border-radius: 8px; margin: 8px 0;
+    background: #eef3ee; color: #2f4b34; border: 1px solid #d9e6db;
+  }
+  .ranking-line small { color: #5b6f60; }
+  .showroom-line {
+    font-size: 12.5px; padding: 7px 10px; border-radius: 8px; margin: 8px 0;
+    background: #f6f2e6; color: #6b5322; border: 1px solid #ecdfc0;
+  }
+  .pendencia-box {
+    font-size: 12.5px; padding: 8px 10px; border-radius: 8px; margin: 8px 0;
+    background: var(--urgente-bg); color: var(--urgente); border: 1px solid #f3c9c5;
+    display:flex; justify-content: space-between; align-items:center; gap: 10px;
+  }
+  .pendencia-box button {
+    font-size: 11.5px; border: 1px solid var(--urgente); background: white; color: var(--urgente);
+    border-radius: 6px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .last-interaction {
+    font-size: 12.5px; color: var(--ink-soft); margin: 6px 0;
+  }
+  .card-actions { display:flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--gold-light); background: #fff; color: var(--gold);
+    border-radius: 8px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; font-weight: 600;
+  }
+  .btn:hover { background: #fbf5e9; }
+  .btn-primary { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .btn-primary:hover { background: #8f7130; }
+  .btn-ghost { border-color: var(--border); color: var(--ink-soft); }
+  .btn-warn { border-color: #d8b0ac; color: var(--urgente); }
+  .btn-sm { padding: 4px 9px; font-size: 11.5px; }
+  .form-box {
+    margin-top: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; background: #fcfaf6;
+  }
+  .form-row { display:flex; gap:10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .form-row label { font-size: 12px; color: var(--ink-soft); display:block; margin-bottom:3px; }
+  .form-row input[type=text], .form-row input[type=date], .form-row input[type=number], .form-row textarea {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit;
+  }
+  .form-row textarea { min-height: 50px; resize: vertical; }
+  .radio-group { display:flex; gap: 14px; }
+  .radio-group label { display:flex; align-items:center; gap:5px; font-size: 13px; color: var(--ink); cursor:pointer;}
+  .check-inline { display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:8px; }
+  .history-toggle { font-size: 12px; color: var(--gold); cursor: pointer; text-decoration: underline; margin-top: 6px; display:inline-block;}
+  .history-list { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .history-entry { font-size: 12px; color: var(--ink-soft); padding: 6px 0; border-bottom: 1px dotted var(--border); }
+  .history-entry:last-child { border-bottom: none; }
+  .empty-state { text-align:center; padding: 40px 20px; color: var(--ink-soft); }
+  .hidden { display: none !important; }
+  .group-panel {
+    margin-top: 10px; padding: 12px; border: 1px solid #ecdfc0; border-radius: 10px; background: #fbf7ec;
+  }
+  .group-panel h4 { margin: 0 0 8px; font-size: 13px; color: #6b5322; }
+  .candidate-row {
+    display:flex; justify-content: space-between; align-items:center; padding: 6px 8px;
+    border-bottom: 1px dotted var(--border); font-size: 12.5px; gap: 8px;
+  }
+  .candidate-row:last-child { border-bottom: none; }
+  .candidate-info { flex:1; }
+  .candidate-info .cname { font-weight: 600; }
+  .candidate-info .cmeta { color: var(--ink-soft); font-size: 11.5px; }
+  .member-row {
+    display:flex; justify-content: space-between; align-items:center; padding: 6px 0;
+    border-bottom: 1px dotted var(--border); font-size: 12px; gap: 8px;
+  }
+  .member-row:last-child { border-bottom: none; }
+  .inactive-toggle-line {
+    font-size: 12.5px; color: var(--gold); cursor: pointer; text-decoration: underline; margin: 10px 0;
+  }
+
+  .topbar-actions { display:flex; align-items:center; gap:8px; }
+  .sync-btn {
+    border: 1px solid var(--gold-light); background: #fbf5e9; color: var(--gold);
+    border-radius: 999px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-weight: 700;
+    display:flex; align-items:center; gap:6px;
+  }
+  .sync-btn:disabled { opacity:0.6; cursor: default; }
+  .sync-btn .spin {
+    width:11px; height:11px; border-radius:50%; border:2px solid var(--gold-light);
+    border-top-color: var(--gold); display:inline-block; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gear-btn {
+    border: 1px solid var(--border); background: var(--card); color: var(--ink-soft);
+    border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+  }
+  .last-sync-note { font-size: 11.5px; color: var(--ink-soft); margin: -10px 0 14px; }
+  .sync-summary { font-size: 12px; color: #2f4b34; background:#eef3ee; border:1px solid #d9e6db;
+    border-radius:8px; padding:8px 10px; margin-bottom:14px; }
+  .sync-error { font-size: 12px; color: var(--urgente); background: var(--urgente-bg);
+    border:1px solid #f3c9c5; border-radius:8px; padding:8px 10px; margin-bottom:14px; }
+  .center-screen { max-width: 420px; margin: 60px auto; text-align:center; padding: 0 16px; }
+  .center-screen h1 { font-size: 20px; }
+  .center-screen .subtitle { margin-bottom: 22px; }
+  .center-screen input[type=text], .center-screen input[type=password] {
+    width:100%; padding: 12px 14px; border:1px solid var(--border); border-radius: var(--radius);
+    font-size: 14px; margin-bottom: 10px; font-family: inherit;
+  }
+  .center-screen .btn-primary { width:100%; padding: 12px; border-radius: var(--radius); font-size: 14px; }
+  .settings-panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 16px;
+  }
+  .settings-panel label { font-size: 12px; color: var(--ink-soft); display:block; margin-bottom:4px; }
+  .settings-panel input { width:100%; padding: 9px 11px; border:1px solid var(--border);
+    border-radius: 8px; font-size: 13px; margin-bottom: 10px; font-family: inherit; }
+  .spinner-big {
+    width:34px; height:34px; border-radius:50%; border:3px solid var(--border);
+    border-top-color: var(--gold); margin: 0 auto 16px; animation: spin 0.8s linear infinite;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ---------- CONFIG ----------
+const DEFAULT_API_BASE = 'https://basp-rotas-api.onrender.com';
+const API_BASE_KEY = 'basp_rotas_api_base_v1';
+const API_TOKEN_KEY = 'basp_rotas_api_token_v1';
+const LAST_CITY_KEY = 'basp_rotas_last_city_v1';
+
+function getApiBase() { return localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE; }
+function getApiToken() { return localStorage.getItem(API_TOKEN_KEY) || ''; }
+function setApiConfig(base, token) {
+  localStorage.setItem(API_BASE_KEY, base || DEFAULT_API_BASE);
+  localStorage.setItem(API_TOKEN_KEY, token || '');
+}
+
+async function apiFetch(path, options) {
+  const base = getApiBase().replace(/\/$/, '');
+  const token = getApiToken();
+  const opts = Object.assign({}, options);
+  opts.headers = Object.assign({ 'Content-Type': 'application/json', 'x-api-token': token }, (options && options.headers) || {});
+  const res = await fetch(base + path, opts);
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  if (!res.ok) {
+    const msg = (body && body.error) ? body.error : ('Erro ' + res.status + ' ao falar com o servidor.');
+    throw new Error(msg);
+  }
+  return body;
+}
+
+// ---------- HELPERS ----------
+function fmtDate(d) {
+  if (!d) return '--';
+  const dt = (d instanceof Date) ? d : new Date(d + 'T00:00:00Z');
+  return dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+function fmtMoney(v) {
+  if (v == null) return null;
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDateTime(iso) {
+  if (!iso) return 'nunca';
+  const dt = new Date(iso);
+  return dt.toLocaleString('pt-BR');
+}
+
+// ---------- STATE ----------
+let state = {
+  screen: 'home', cityKey: null, search: '',
+  openForm: null, openHistory: {}, openGroupPicker: null,
+  groupSearchAll: {}, groupSearch: {}, showInactive: {},
+  data: null, loading: true, error: null,
+  syncing: false, syncMsg: null,
+  settingsDraft: null,
+};
+
+function entities() { return (state.data && state.data.clients) || []; }
+
+function allCities() {
+  const map = new Map();
+  entities().forEach(e => { if (!map.has(e.cdk)) map.set(e.cdk, { cdk: e.cdk, cd: e.cd, uf: e.uf }); });
+  return Array.from(map.values()).sort((a, b) => a.cd.localeCompare(b.cd, 'pt-BR'));
+}
+
+function cityStats(cdk) {
+  const items = entities().filter(e => e.cdk === cdk);
+  let urgentes = 0, pendencias = 0, inativos = 0;
+  items.forEach(e => {
+    if (e.urgencia.rank === 0) urgentes++;
+    if (e.urgencia.rank === 9) inativos++;
+    pendencias += e.pendencias.length;
+  });
+  return { total: items.length, urgentes, pendencias, inativos };
+}
+
+function globalStats() {
+  let urgentes = 0, pendencias = 0;
+  entities().forEach(e => {
+    if (e.urgencia.rank === 0) urgentes++;
+    pendencias += e.pendencias.length;
+  });
+  return { total: entities().length, urgentes, pendencias, cidades: allCities().length };
+}
+
+// ---------- DATA LOADING ----------
+async function loadData(showLoading) {
+  if (showLoading !== false) state.loading = true;
+  state.error = null;
+  render();
+  try {
+    const res = await apiFetch('/api/data');
+    state.data = res;
+    state.error = null;
+  } catch (e) {
+    state.error = e.message || 'Não foi possível conectar ao servidor.';
+  }
+  state.loading = false;
+  render();
+}
+
+async function doSync() {
+  state.syncing = true;
+  state.syncMsg = null;
+  render();
+  try {
+    const res = await apiFetch('/api/sync', { method: 'POST' });
+    const s = res.summary || {};
+    state.syncMsg = { type: 'ok', text: `Sincronizado: ${s.added || 0} novo(s), ${s.updated || 0} atualizado(s), ${s.unchanged || 0} sem mudança.` };
+    await loadData(false);
+  } catch (e) {
+    state.syncMsg = { type: 'error', text: 'Erro ao sincronizar: ' + e.message };
+  }
+  state.syncing = false;
+  render();
+}
+
+async function postAndUpdate(path, body) {
+  const res = await apiFetch(path, { method: 'POST', body: JSON.stringify(body || {}) });
+  state.data = res;
+  render();
+}
+
+// ---------- NAVIGATION ----------
+function go(screen, cityKey) {
+  state.screen = screen;
+  state.cityKey = cityKey || null;
+  state.search = '';
+  state.openForm = null;
+  state.openGroupPicker = null;
+  if (cityKey) localStorage.setItem(LAST_CITY_KEY, cityKey);
+  render();
+}
+
+function openSettings() {
+  state.settingsDraft = { base: getApiBase(), token: getApiToken() };
+  state.screen = 'settings';
+  render();
+}
+
+// ---------- RENDER ----------
+function render() {
+  const app = document.getElementById('app');
+  if (state.screen === 'settings') {
+    app.innerHTML = renderSettings();
+    bindSettingsEvents();
+    return;
+  }
+  if (!getApiToken()) {
+    app.innerHTML = renderSettings(true);
+    bindSettingsEvents();
+    return;
+  }
+  if (state.loading && !state.data) {
+    app.innerHTML = renderLoading();
+    return;
+  }
+  if (state.error && !state.data) {
+    app.innerHTML = renderError();
+    bindErrorEvents();
+    return;
+  }
+  if (state.screen === 'home') {
+    app.innerHTML = renderHome();
+  } else if (state.screen === 'city') {
+    app.innerHTML = renderCity(state.cityKey);
+  }
+  bindEvents();
+}
+
+function renderLoading() {
+  return `<div class="center-screen">
+    <div class="spinner-big"></div>
+    <h1 class="display-font">Conectando ao servidor...</h1>
+    <div class="subtitle">Se o servidor estava dormindo, a primeira carga pode levar até 1 minuto.</div>
+  </div>`;
+}
+
+function renderError() {
+  return `<div class="center-screen">
+    <h1 class="display-font">Não consegui conectar</h1>
+    <div class="subtitle">${state.error}</div>
+    <button class="btn btn-primary" id="btn-retry" style="width:100%;padding:12px;">Tentar de novo</button>
+    <div style="margin-top:14px;"><button class="btn btn-ghost" id="btn-open-settings" style="width:100%;padding:10px;">Verificar configuração de conexão</button></div>
+  </div>`;
+}
+
+function renderSettings(first) {
+  const draft = state.settingsDraft || { base: getApiBase(), token: getApiToken() };
+  return `<div class="center-screen" style="max-width:480px;">
+    ${first ? `<h1 class="display-font">Olá Bruno, vamos conectar o painel</h1>
+    <div class="subtitle">Cole abaixo o endereço do servidor e o token de acesso que você configurou no Render (variável API_TOKEN).</div>` :
+    `<h1 class="display-font">Configuração de conexão</h1>
+    <div class="subtitle">Endereço do servidor e token de acesso (API_TOKEN configurado no Render).</div>`}
+    <div class="settings-panel" style="text-align:left;">
+      <label>Endereço do servidor (basp-rotas-api)</label>
+      <input type="text" id="set-base" value="${draft.base}">
+      <label>Token de acesso (API_TOKEN)</label>
+      <input type="password" id="set-token" value="${draft.token}" placeholder="cole aqui o mesmo valor que está no Render">
+    </div>
+    <button class="btn btn-primary" id="btn-save-settings" style="width:100%;padding:12px;">Salvar e conectar</button>
+    ${!first ? '<div style="margin-top:10px;"><button class="btn btn-ghost" id="btn-cancel-settings" style="width:100%;padding:10px;">Cancelar</button></div>' : ''}
+  </div>`;
+}
+
+function renderTopbar() {
+  const meta = state.data && state.data.meta;
+  return `<div class="topbar">
+    <div class="brand">BASP Copilot<small>Módulo Rotas Inteligentes</small></div>
+    <div class="topbar-actions">
+      <button class="sync-btn" id="btn-sync" ${state.syncing ? 'disabled' : ''}>
+        ${state.syncing ? '<span class="spin"></span> Sincronizando...' : '⟳ Atualizar'}
+      </button>
+      <button class="gear-btn" id="btn-gear" title="Configurar conexão">⚙</button>
+    </div>
+  </div>
+  <div class="last-sync-note">Última sincronização com o Mercos: ${meta ? fmtDateTime(meta.lastSync) : '--'}</div>
+  ${state.syncMsg ? `<div class="${state.syncMsg.type === 'ok' ? 'sync-summary' : 'sync-error'}">${state.syncMsg.text}</div>` : ''}`;
+}
+
+function renderHome() {
+  const gs = globalStats();
+  const lastCity = localStorage.getItem(LAST_CITY_KEY);
+  const lastCityObj = lastCity ? entities().find(e => e.cdk === lastCity) : null;
+  let cities = allCities();
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    cities = cities.filter(c => c.cd.toLowerCase().includes(q) || c.uf.toLowerCase().includes(q));
+  }
+  const rows = cities.map(city => {
+    const st = cityStats(city.cdk);
+    return `<div class="city-row" data-city="${city.cdk}">
+      <div><span class="name">${city.cd}</span><span class="uf">${city.uf}</span></div>
+      <div class="meta">
+        ${st.urgentes > 0 ? `<span class="badge badge-urgente">${st.urgentes} urgente${st.urgentes > 1 ? 's' : ''}</span>` : ''}
+        ${st.pendencias > 0 ? `<span class="badge badge-atencao">${st.pendencias} pendência${st.pendencias > 1 ? 's' : ''}</span>` : ''}
+        <span class="badge badge-count">${st.total} cliente${st.total > 1 ? 's' : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${renderTopbar()}
+    <div class="stats-strip">
+      <span class="stat-chip"><b>${gs.total}</b> clientes</span>
+      <span class="stat-chip"><b>${gs.cidades}</b> cidades</span>
+      <span class="stat-chip"><b>${gs.urgentes}</b> urgentes hoje</span>
+      <span class="stat-chip"><b>${gs.pendencias}</b> pendências abertas</span>
+    </div>
+    <h1>Olá Bruno, qual cidade você está hoje?</h1>
+    <div class="subtitle">Escolha a cidade para ver a carteira local: urgência de cada cliente, posição por tamanho de compra, última interação registrada e pendências em aberto.</div>
+    ${lastCityObj ? `<div class="last-city-btn" id="btn-last-city">Continuar em ${lastCityObj.cd}/${lastCityObj.uf} →</div>` : ''}
+    <input class="search-box" id="city-search" placeholder="Buscar cidade ou estado..." value="${state.search}">
+    <div class="city-list">${rows || '<div class="empty-state">Nenhuma cidade encontrada.</div>'}</div>
+  `;
+}
+
+function renderCity(cdk) {
+  const items = entities().filter(e => e.cdk === cdk);
+  const cityMeta = items[0];
+  let filtered = items;
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    filtered = items.filter(e => e.label.toLowerCase().includes(q));
+  }
+
+  const active = [];
+  const inactive = [];
+  filtered.forEach(e => { if (e.urgencia.rank === 9) inactive.push(e); else active.push(e); });
+  active.sort((a, b) => {
+    if (a.urgencia.rank !== b.urgencia.rank) return a.urgencia.rank - b.urgencia.rank;
+    return (b.dias ?? -1) - (a.dias ?? -1);
+  });
+  inactive.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+  const st = cityStats(cdk);
+  const showInactive = !!state.showInactive[cdk];
+
+  const cards = active.map(e => renderCard(e)).join('');
+  const inactiveCards = inactive.map(e => renderCard(e)).join('');
+
+  return `
+    ${renderTopbar()}
+    <div class="backbar">
+      <button class="back-btn" id="btn-back">← Trocar cidade</button>
+    </div>
+    <h1>${cityMeta ? cityMeta.cd : ''} <span style="color:var(--ink-soft); font-weight:400;">/ ${cityMeta ? cityMeta.uf : ''}</span></h1>
+    <div class="stats-strip">
+      <span class="stat-chip"><b>${st.total}</b> clientes</span>
+      <span class="stat-chip"><b>${st.urgentes}</b> urgentes</span>
+      <span class="stat-chip"><b>${st.pendencias}</b> pendências abertas</span>
+      ${st.inativos > 0 ? `<span class="stat-chip"><b>${st.inativos}</b> marcados inativos</span>` : ''}
+    </div>
+    <input class="search-box" id="client-search" placeholder="Buscar cliente nesta cidade..." value="${state.search}">
+    ${cards || '<div class="empty-state">Nenhum cliente encontrado.</div>'}
+    ${inactive.length ? `<div class="inactive-toggle-line" id="toggle-inactive" data-city="${cdk}">${showInactive ? 'Ocultar' : 'Mostrar'} ${inactive.length} cliente(s) marcado(s) como inativo</div>` : ''}
+    ${showInactive ? inactiveCards : ''}
+  `;
+}
+
+function renderCard(entity) {
+  const key = entity.logId;
+  const encKey = encodeURIComponent(key);
+  const u = entity.urgencia;
+  const entries = entity.entries;
+  const pend = entity.pendencias;
+  const sr = entity.showroom;
+  const dias = entity.dias;
+  const ciclo = entity.ciclo;
+  const formOpen = state.openForm === key;
+  const historyOpen = !!state.openHistory[key];
+  const groupPickerOpen = state.openGroupPicker === key;
+  const escritorioCount = entries.filter(e => e.tipo === 'escritorio').length;
+  const visitaCount = entries.filter(e => e.tipo === 'visita').length;
+  const inactive = u.rank === 9;
+  const valorTotal = entity.valorTotal;
+
+  return `<div class="client-card ${inactive ? 'is-inactive' : ''}" data-key="${encKey}">
+    <div class="client-head">
+      <div>
+        <div class="client-name">${entity.label} ${entity.isGroup ? `<span class="badge badge-group">🔗 ${entity.members.length} CNPJs agrupados</span>` : ''}</div>
+        <div class="client-sub">${entity.end || ''}${entity.tel ? ' · <a href="tel:' + entity.tel.replace(/[^\d+]/g, '') + '">' + entity.tel + '</a>' : ''}</div>
+      </div>
+      <div class="badges-row">
+        <span class="badge badge-${u.cls}">${u.label}</span>
+      </div>
+    </div>
+    <div class="metrics-row">
+      <span>Situação Mercos: <b>${entity.sitDisplay}</b></span>
+      <span>Dias sem comprar: <b>${dias ?? '--'}</b></span>
+      <span>Ciclo médio: <b>${ciclo ?? '--'}</b> dias</span>
+      <span>Log: <b>${visitaCount}</b> visita(s) / <b>${escritorioCount}</b> escritório</span>
+    </div>
+    <div class="ranking-line">
+      📊 Posição na cidade: <b>${entity.cityRank ? entity.cityRank.pos + 'º de ' + entity.cityRank.total : '--'}</b>
+      &nbsp;·&nbsp; Posição geral: <b>${entity.overallRank ? entity.overallRank + 'º de ' + entity.overallTotal : '--'}</b>
+      &nbsp;·&nbsp; ${valorTotal > 0 ? fmtMoney(valorTotal) : 'sem valor conhecido'}
+      <br><small>Baseado no valor do último pedido do Mercos + pedidos registrados aqui no app.</small>
+    </div>
+    <div class="showroom-line">${sr.text}</div>
+    ${pend.map(p => `<div class="pendencia-box">
+        <span>⚠️ ${p.pendencia}</span>
+        <button data-resolve="${p.id}" data-key="${encKey}">Marcar resolvida</button>
+      </div>`).join('')}
+    <div class="last-interaction">
+      ${entries.length ? `Última interação: ${fmtDate(entries[0].date)} — ${entries[0].tipo === 'visita' ? 'Visita presencial' : 'Pedido escritório'}${entries[0].obs ? ' · ' + entries[0].obs : ''}` : 'Nenhuma interação registrada ainda.'}
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-primary" data-toggle-form="${encKey}">${formOpen ? 'Fechar' : '+ Registrar interação'}</button>
+      ${entries.length ? `<button class="btn btn-ghost" data-toggle-history="${encKey}">${historyOpen ? 'Ocultar histórico' : 'Ver histórico (' + entries.length + ')'}</button>` : ''}
+      <button class="btn btn-ghost" data-toggle-group="${encKey}">🔗 ${entity.isGroup ? 'Gerenciar CNPJs' : 'Agrupar CNPJ'}</button>
+      <button class="btn ${inactive ? 'btn-ghost' : 'btn-warn'}" data-toggle-inactive="${encKey}">${inactive ? '▶ Reativar' : '⏸ Marcar inativo'}</button>
+    </div>
+    ${formOpen ? renderForm(entity) : ''}
+    ${historyOpen ? renderHistory(entries) : ''}
+    ${groupPickerOpen ? renderGroupPanel(entity) : ''}
+  </div>`;
+}
+
+function todayISO() {
+  const n = new Date();
+  return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())).toISOString().slice(0, 10);
+}
+
+function renderForm(entity) {
+  const key = entity.logId;
+  const encKey = encodeURIComponent(key);
+  const today = todayISO();
+  return `<div class="form-box" data-form-key="${encKey}">
+    <div class="form-row">
+      <div style="flex:1; min-width:140px;">
+        <label>Data</label>
+        <input type="date" class="f-date" value="${today}">
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <label>Tipo de contato</label>
+        <div class="radio-group">
+          <label><input type="radio" name="tipo-${encKey}" class="f-tipo" value="visita" checked> Visita presencial</label>
+          <label><input type="radio" name="tipo-${encKey}" class="f-tipo" value="escritorio"> Pedido escritório</label>
+        </div>
+      </div>
+    </div>
+    <div class="check-inline">
+      <input type="checkbox" class="f-pedido"> <span>Fechou pedido nesta interação</span>
+    </div>
+    <div class="form-row f-valor-row hidden">
+      <div style="flex:1;">
+        <label>Valor do pedido (R$)</label>
+        <input type="number" class="f-valor" step="0.01" placeholder="0,00">
+      </div>
+    </div>
+    <div class="form-row">
+      <div style="flex:1;">
+        <label>O que aconteceu</label>
+        <textarea class="f-obs" placeholder="Ex: cliente pediu catálogo novo, mostrou interesse em linha X..."></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div style="flex:1;">
+        <label>Pendência (opcional)</label>
+        <textarea class="f-pend" placeholder="Ex: enviar tabela de preço atualizada"></textarea>
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-primary" data-save-form="${encKey}">Salvar</button>
+      <button class="btn btn-ghost" data-cancel-form="${encKey}">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function renderHistory(entries) {
+  return `<div class="history-list">
+    ${entries.map(e => `<div class="history-entry">
+      <b>${fmtDate(e.date)}</b> — ${e.tipo === 'visita' ? 'Visita presencial' : 'Pedido escritório'}
+      ${e.pedido ? ' · pedido fechado' + (e.valor ? ' (' + fmtMoney(e.valor) + ')' : '') : ''}
+      ${e.obs ? '<br>' + e.obs : ''}
+      ${e.pendencia ? '<br>Pendência: ' + e.pendencia + (e.pendenciaResolvida ? ' (resolvida)' : ' (em aberto)') : ''}
+    </div>`).join('')}
+  </div>`;
+}
+
+function renderGroupPanel(entity) {
+  const key = entity.logId;
+  const encKey = encodeURIComponent(key);
+  const searchAll = !!state.groupSearchAll[key];
+  const query = (state.groupSearch[key] || '').toLowerCase();
+
+  let candidates = entities().filter(e => e.logId !== key);
+  if (!searchAll) candidates = candidates.filter(e => e.cdk === entity.cdk);
+  if (query) candidates = candidates.filter(e => e.label.toLowerCase().includes(query));
+  candidates = candidates.slice(0, 25);
+
+  const membersList = entity.isGroup ? entity.members.map(m => `
+    <div class="member-row">
+      <span>${m.c} <span style="color:var(--ink-soft);">(${m.sit || '--'}, ${m.cd})</span></span>
+      ${entity.members.length > 1 ? `<button class="btn btn-ghost btn-sm" data-unlink="${encodeURIComponent(m.c)}" data-group="${encKey}">Desvincular</button>` : ''}
+    </div>`).join('') : '';
+
+  return `<div class="group-panel" data-group-key="${encKey}">
+    ${entity.isGroup ? `<h4>CNPJs agrupados neste cliente</h4>${membersList}<div style="margin:8px 0;"></div>` : ''}
+    <h4>Vincular outro CNPJ a este cliente</h4>
+    <div class="form-row">
+      <div style="flex:1;">
+        <input type="text" class="g-search" placeholder="Buscar cliente/CNPJ..." value="${state.groupSearch[key] || ''}">
+      </div>
+    </div>
+    <div class="check-inline">
+      <input type="checkbox" class="g-search-all" ${searchAll ? 'checked' : ''}> <span>Buscar em todas as cidades</span>
+    </div>
+    <div class="candidates">
+      ${candidates.map(c => `<div class="candidate-row">
+        <div class="candidate-info"><span class="cname">${c.label}</span><br><span class="cmeta">${c.cd}/${c.uf} · ${c.sitDisplay}</span></div>
+        <button class="btn btn-primary btn-sm" data-link-to="${encodeURIComponent(c.logId)}" data-group="${encKey}">Vincular</button>
+      </div>`).join('') || '<div class="empty-state" style="padding:14px;">Nenhum candidato encontrado.</div>'}
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-ghost" data-close-group="${encKey}">Fechar</button>
+    </div>
+  </div>`;
+}
+
+// ---------- GROUPING LOGIC ----------
+async function linkEntities(entityA, entityB) {
+  const anchor = entityA.members[0].c;
+  const others = entityA.members.slice(1).map(m => m.c).concat(entityB.members.map(m => m.c));
+  for (const other of others) {
+    await postAndUpdate('/api/clients/group', { nameA: anchor, nameB: other });
+  }
+}
+
+// ---------- SETTINGS EVENTS ----------
+function bindSettingsEvents() {
+  const saveBtn = document.getElementById('btn-save-settings');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    const base = document.getElementById('set-base').value.trim() || DEFAULT_API_BASE;
+    const token = document.getElementById('set-token').value.trim();
+    setApiConfig(base, token);
+    state.screen = 'home';
+    loadData();
+  });
+  const cancelBtn = document.getElementById('btn-cancel-settings');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => { state.screen = 'home'; render(); });
+}
+
+function bindErrorEvents() {
+  const retryBtn = document.getElementById('btn-retry');
+  if (retryBtn) retryBtn.addEventListener('click', () => loadData());
+  const settingsBtn = document.getElementById('btn-open-settings');
+  if (settingsBtn) settingsBtn.addEventListener('click', () => openSettings());
+}
+
+// ---------- EVENTS ----------
+function bindEvents() {
+  const searchHome = document.getElementById('city-search');
+  if (searchHome) searchHome.addEventListener('input', e => { state.search = e.target.value; render(); preserveFocus('city-search'); });
+  const searchCity = document.getElementById('client-search');
+  if (searchCity) searchCity.addEventListener('input', e => { state.search = e.target.value; render(); preserveFocus('client-search'); });
+  const lastBtn = document.getElementById('btn-last-city');
+  if (lastBtn) lastBtn.addEventListener('click', () => go('city', localStorage.getItem(LAST_CITY_KEY)));
+
+  const syncBtn = document.getElementById('btn-sync');
+  if (syncBtn) syncBtn.addEventListener('click', () => doSync());
+  const gearBtn = document.getElementById('btn-gear');
+  if (gearBtn) gearBtn.addEventListener('click', () => openSettings());
+
+  document.querySelectorAll('.city-row').forEach(row => {
+    row.addEventListener('click', () => go('city', row.getAttribute('data-city')));
+  });
+
+  const backBtn = document.getElementById('btn-back');
+  if (backBtn) backBtn.addEventListener('click', () => go('home'));
+
+  const toggleInactive = document.getElementById('toggle-inactive');
+  if (toggleInactive) toggleInactive.addEventListener('click', () => {
+    const cdk = toggleInactive.getAttribute('data-city');
+    state.showInactive[cdk] = !state.showInactive[cdk];
+    render();
+  });
+
+  document.querySelectorAll('[data-toggle-form]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-form'));
+      state.openForm = (state.openForm === key) ? null : key;
+      state.openGroupPicker = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-cancel-form]').forEach(btn => {
+    btn.addEventListener('click', () => { state.openForm = null; render(); });
+  });
+  document.querySelectorAll('[data-toggle-history]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-history'));
+      state.openHistory[key] = !state.openHistory[key];
+      render();
+    });
+  });
+  document.querySelectorAll('[data-resolve]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-key'));
+      const id = btn.getAttribute('data-resolve');
+      btn.disabled = true;
+      try {
+        await postAndUpdate(`/api/clients/${encodeURIComponent(key)}/pendencias/${encodeURIComponent(id)}/resolver`, {});
+      } catch (e) { alert('Erro: ' + e.message); render(); }
+    });
+  });
+  document.querySelectorAll('.f-pedido').forEach(chk => {
+    chk.addEventListener('change', (e) => {
+      const box = e.target.closest('.form-box');
+      const valorRow = box.querySelector('.f-valor-row');
+      valorRow.classList.toggle('hidden', !e.target.checked);
+    });
+  });
+  document.querySelectorAll('[data-save-form]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-save-form'));
+      const box = document.querySelector(`.form-box[data-form-key="${CSS.escape(encodeURIComponent(key))}"]`);
+      if (!box) return;
+      const date = box.querySelector('.f-date').value || todayISO();
+      const tipo = box.querySelector('.f-tipo:checked') ? box.querySelector('.f-tipo:checked').value : 'visita';
+      const pedido = box.querySelector('.f-pedido').checked;
+      const valor = pedido ? parseFloat(box.querySelector('.f-valor').value || '0') || null : null;
+      const obs = box.querySelector('.f-obs').value.trim();
+      const pendencia = box.querySelector('.f-pend').value.trim();
+      btn.disabled = true;
+      try {
+        await postAndUpdate(`/api/clients/${encodeURIComponent(key)}/interactions`, { date, tipo, pedido, valor, obs, pendencia });
+        state.openForm = null;
+        render();
+      } catch (e) { alert('Erro ao salvar: ' + e.message); render(); }
+    });
+  });
+
+  // grouping
+  document.querySelectorAll('[data-toggle-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-group'));
+      state.openGroupPicker = (state.openGroupPicker === key) ? null : key;
+      state.openForm = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-close-group]').forEach(btn => {
+    btn.addEventListener('click', () => { state.openGroupPicker = null; render(); });
+  });
+  document.querySelectorAll('.g-search').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      const panel = e.target.closest('.group-panel');
+      const key = decodeURIComponent(panel.getAttribute('data-group-key'));
+      state.groupSearch[key] = e.target.value;
+      render();
+      const el = document.querySelector(`.group-panel[data-group-key="${CSS.escape(encodeURIComponent(key))}"] .g-search`);
+      if (el) { el.focus(); const v = el.value; el.value = ''; el.value = v; }
+    });
+  });
+  document.querySelectorAll('.g-search-all').forEach(chk => {
+    chk.addEventListener('change', (e) => {
+      const panel = e.target.closest('.group-panel');
+      const key = decodeURIComponent(panel.getAttribute('data-group-key'));
+      state.groupSearchAll[key] = e.target.checked;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-link-to]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const thisKey = decodeURIComponent(btn.getAttribute('data-group'));
+      const otherKey = decodeURIComponent(btn.getAttribute('data-link-to'));
+      const thisEntity = entities().find(e => e.logId === thisKey);
+      const otherEntity = entities().find(e => e.logId === otherKey);
+      if (!thisEntity || !otherEntity) return;
+      btn.disabled = true;
+      try {
+        await linkEntities(thisEntity, otherEntity);
+        state.openGroupPicker = null;
+        render();
+      } catch (e) { alert('Erro ao vincular: ' + e.message); render(); }
+    });
+  });
+  document.querySelectorAll('[data-unlink]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = decodeURIComponent(btn.getAttribute('data-unlink'));
+      btn.disabled = true;
+      try {
+        await postAndUpdate('/api/clients/unlink', { name });
+      } catch (e) { alert('Erro ao desvincular: ' + e.message); render(); }
+    });
+  });
+
+  // manual inactive toggle
+  document.querySelectorAll('[data-toggle-inactive]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-inactive'));
+      const entity = entities().find(e => e.logId === key);
+      const isInactive = entity && entity.urgencia.rank === 9;
+      btn.disabled = true;
+      try {
+        await postAndUpdate(`/api/clients/${encodeURIComponent(key)}/inactive`, { inactive: !isInactive });
+      } catch (e) { alert('Erro: ' + e.message); render(); }
+    });
+  });
+}
+
+function preserveFocus(id) {
+  const el = document.getElementById(id);
+  if (el) { el.focus(); const v = el.value; el.value = ''; el.value = v; }
+}
+
+// ---------- INIT ----------
+if (getApiToken()) { loadData(); } else { render(); }
+</script>
+</body>
+</html>
