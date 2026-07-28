@@ -288,6 +288,15 @@
   .fab-ticket.elegivel { background:#fff4dc; border-color:#e0c68a; color:#8a6200; font-weight:600; }
   .fab-ticket.oportunidade { background:#fdecea; border-color:#e6b3ae; color:#a3241c; font-weight:700; }
   .fab-ticket .val { font-size:10.5px; opacity:.85; font-weight:400; }
+  .fab-ticket.arquivada { opacity:.5; text-decoration: line-through; }
+  .fab-item { display:inline-flex; align-items:center; }
+  .fab-item .fab-ticket { border-top-right-radius:0; border-bottom-right-radius:0; border-right:none; }
+  .fab-arq {
+    border:1px solid var(--border); border-left:none; background:var(--card);
+    border-radius:0 999px 999px 0; padding:7px 10px; font-size:12px; cursor:pointer;
+    color:var(--ink-soft); font-family:inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .fab-arq:hover { background:#fdecea; color:var(--urgente); }
   .fab-legenda { font-size:11px; color:var(--ink-soft); margin-top:9px; line-height:1.5; }
   .fab-alerta {
     margin-top:9px; padding:9px 11px; background:#fdecea; border-left:3px solid var(--urgente);
@@ -384,13 +393,18 @@ function fmtDateTime(iso) {
 let state = {
   screen: 'home', cityKey: null, search: '',
   openForm: null, openHistory: {}, openGroupPicker: null,
-  openApelido: null, openFabricas: {},
+  openApelido: null, openFabricas: {}, verTodasFabricas: {},
   filtro: 'todos', ordem: 'urgencia',
   groupSearchAll: {}, groupSearch: {}, showInactive: {},
   data: null, loading: true, error: null,
   syncing: false, syncMsg: null,
   settingsDraft: null,
 };
+
+/** Fabricas que o Bruno arquivou (nao trabalha mais). So afeta a exibicao. */
+function arquivadasSet() {
+  return new Set((state.data && state.data.fabricasArquivadas) || []);
+}
 
 /** Fabricas que o Bruno marcou como elegiveis mas o cliente nunca comprou. */
 function fabricasNuncaCompradas(entity) {
@@ -875,20 +889,43 @@ function renderFabricas(entity) {
   const mapa = {};
   compradas.forEach(f => { mapa[f.nome] = f; });
   const elegiveis = entity.fabricasElegiveis || [];
-  const lista = todasFabricas();
+  const verTudo = !!state.verTodasFabricas[entity.logId];
+
+  // Fábricas arquivadas somem da lista para não poluir. É só visual:
+  // o faturamento delas continua contando no total e no ranking.
+  const arquivadas = arquivadasSet();
+  const todas = todasFabricas();
+  const relevantes = todas.filter(n => !arquivadas.has(n));
+  const ocultas = todas.length - relevantes.length;
+  const lista = (verTudo ? todas : relevantes).slice().sort((a, b) => {
+    // já compradas primeiro, do maior valor para o menor
+    const va = mapa[a] ? mapa[a].total : -1;
+    const vb = mapa[b] ? mapa[b].total : -1;
+    if (va !== vb) return vb - va;
+    // depois as elegíveis ainda não compradas
+    const ea = elegiveis.indexOf(a) >= 0 ? 1 : 0;
+    const eb = elegiveis.indexOf(b) >= 0 ? 1 : 0;
+    if (ea !== eb) return eb - ea;
+    return a.localeCompare(b, 'pt-BR');
+  });
 
   const tickets = lista.map(nome => {
     const comprou = !!mapa[nome];
     const elegivel = elegiveis.indexOf(nome) >= 0;
-    let cls = '';
-    if (comprou) cls = 'comprada';
-    else if (elegivel) cls = 'oportunidade';
+    const arquivada = arquivadas.has(nome);
+    let cls = arquivada ? 'arquivada' : '';
+    if (!arquivada && comprou) cls = 'comprada';
+    else if (!arquivada && elegivel) cls = 'oportunidade';
     const val = comprou
       ? `<span class="val">${fmtMoney(mapa[nome].total)} · ${mapa[nome].pedidos}x</span>`
       : (elegivel ? '<span class="val">nunca comprou</span>' : '');
-    const marca = elegivel ? '☑' : '☐';
-    return `<button class="fab-ticket ${cls}" data-fab="${encodeURIComponent(nome)}" data-fab-key="${encKey}">
-      ${marca} ${nome} ${val}</button>`;
+    const marca = arquivada ? '🗄' : (elegivel ? '☑' : '☐');
+    return `<span class="fab-item">
+      <button class="fab-ticket ${cls}" data-fab="${encodeURIComponent(nome)}" data-fab-key="${encKey}"
+        title="${arquivada ? 'Fábrica arquivada' : 'Marcar como elegível'}">${marca} ${nome} ${val}</button>
+      <button class="fab-arq" data-arquivar="${encodeURIComponent(nome)}"
+        title="${arquivada ? 'Voltar a trabalhar com esta fábrica' : 'Não trabalho mais com esta fábrica'}">${arquivada ? '↩' : '✕'}</button>
+    </span>`;
   }).join('');
 
   const naoCompradas = elegiveis.filter(f => !mapa[f]);
@@ -899,10 +936,16 @@ function renderFabricas(entity) {
     <div class="fab-legenda">
       <b>Verde</b> = já comprou (valor e nº de pedidos no histórico).
       <b>Vermelho</b> = você marcou como elegível mas ele nunca comprou — é a oportunidade.
-      Toque num ticket para marcar ou desmarcar como elegível.
+      Toque no ticket para marcar ou desmarcar como elegível.<br>
+      O <b>✕</b> ao lado arquiva a fábrica em toda a carteira, para quando você não
+      trabalha mais com ela. Isso é só visual — o faturamento que ela gerou
+      continua contando no total e no ranking.
     </div>
     ${naoCompradas.length ? `<div class="fab-alerta">
       🎯 ${naoCompradas.length} fábrica(s) elegível(is) sem nenhuma compra: <b>${naoCompradas.join(', ')}</b>
+    </div>` : ''}
+    ${(ocultas > 0 || verTudo) ? `<div class="inactive-toggle-line" data-ver-fabricas="${encKey}">
+      ${verTudo ? 'Ocultar as arquivadas' : 'Mostrar ' + ocultas + ' fábrica(s) arquivada(s)'}
     </div>` : ''}
   </div>`;
 }
@@ -1143,6 +1186,27 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       const key = decodeURIComponent(btn.getAttribute('data-toggle-fabricas'));
       state.openFabricas[key] = !state.openFabricas[key];
+      render();
+    });
+  });
+  document.querySelectorAll('[data-arquivar]').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const nome = decodeURIComponent(btn.getAttribute('data-arquivar'));
+      const atuais = ((state.data && state.data.fabricasArquivadas) || []).slice();
+      const i = atuais.indexOf(nome);
+      if (i >= 0) atuais.splice(i, 1); else atuais.push(nome);
+      btn.disabled = true;
+      try {
+        await postAndUpdate('/api/fabricas/arquivadas', { fabricas: atuais });
+        render();
+      } catch (err) { alert(err.message); btn.disabled = false; }
+    });
+  });
+  document.querySelectorAll('[data-ver-fabricas]').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = decodeURIComponent(el.getAttribute('data-ver-fabricas'));
+      state.verTodasFabricas[key] = !state.verTodasFabricas[key];
       render();
     });
   });
