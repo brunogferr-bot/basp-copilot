@@ -240,6 +240,60 @@
   .field-btn.map  { border-color: #b3c8e0; color: #1a4f80; background: #eef4fa; }
   .field-btn.off  { opacity: 0.4; pointer-events: none; }
 
+  /* ===== FILTROS E ORDENACAO ===== */
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin: 4px 0 14px; }
+  .filter-chip {
+    border:1px solid var(--border); background: var(--card); color: var(--ink-soft);
+    border-radius: 999px; padding: 7px 14px; font-size: 12.5px; cursor:pointer;
+    font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .filter-chip b { color: var(--ink); }
+  .filter-chip.on { background: var(--gold); border-color: var(--gold); color:#fff; }
+  .filter-chip.on b { color:#fff; }
+  .sort-select {
+    margin-left:auto; border:1px solid var(--border); background:var(--card);
+    border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-family: inherit; color: var(--ink);
+  }
+  .stat-chip.clicavel { cursor:pointer; }
+  .stat-chip.clicavel:hover { border-color: var(--gold); }
+  .stat-chip.on { background: var(--gold); border-color: var(--gold); color:#fff; }
+  .stat-chip.on b { color:#fff; }
+
+  /* ===== NOME E APELIDO ===== */
+  .client-razao { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+  .apelido-box { margin-top:10px; padding:12px; background:#fbf7ee; border:1px solid var(--border); border-radius:10px; }
+  .apelido-box input { width:100%; padding:10px 12px; border:1px solid var(--border);
+    border-radius:8px; font-size:14px; font-family:inherit; margin-bottom:8px; }
+  .apelido-dica { font-size:11.5px; color:var(--ink-soft); margin-bottom:8px; }
+
+  /* ===== NUMEROS DETALHADOS ===== */
+  .num-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+    gap:8px; margin:10px 0; }
+  .num-box { background:#fbf7ee; border:1px solid var(--border); border-radius:10px; padding:9px 11px; }
+  .num-lab { font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+  .num-val { font-size:15px; font-weight:700; color:var(--ink); margin-top:2px; }
+  .num-sub { font-size:10.5px; color:var(--ink-soft); margin-top:1px; }
+
+  /* ===== FABRICAS ===== */
+  .fab-wrap { margin-top:10px; padding:12px; background:#fbf7ee; border:1px solid var(--border); border-radius:10px; }
+  .fab-titulo { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-soft); margin-bottom:8px; }
+  .fab-tickets { display:flex; flex-wrap:wrap; gap:7px; }
+  .fab-ticket {
+    border:1px solid var(--border); background:var(--card); border-radius:999px;
+    padding:7px 12px; font-size:12px; cursor:pointer; font-family:inherit; color:var(--ink-soft);
+    display:inline-flex; align-items:center; gap:6px; -webkit-tap-highlight-color: transparent;
+  }
+  .fab-ticket.comprada { background:#eef7ee; border-color:#b7d2b9; color:#1f6b25; font-weight:600; }
+  .fab-ticket.elegivel { background:#fff4dc; border-color:#e0c68a; color:#8a6200; font-weight:600; }
+  .fab-ticket.oportunidade { background:#fdecea; border-color:#e6b3ae; color:#a3241c; font-weight:700; }
+  .fab-ticket .val { font-size:10.5px; opacity:.85; font-weight:400; }
+  .fab-legenda { font-size:11px; color:var(--ink-soft); margin-top:9px; line-height:1.5; }
+  .fab-alerta {
+    margin-top:9px; padding:9px 11px; background:#fdecea; border-left:3px solid var(--urgente);
+    border-radius:6px; font-size:12.5px; color:#8a1f18;
+  }
+
   /* ===== CELULAR ===== */
   @media (max-width: 720px) {
     #app { padding: 14px 12px 80px; }
@@ -330,11 +384,29 @@ function fmtDateTime(iso) {
 let state = {
   screen: 'home', cityKey: null, search: '',
   openForm: null, openHistory: {}, openGroupPicker: null,
+  openApelido: null, openFabricas: {},
+  filtro: 'todos', ordem: 'urgencia',
   groupSearchAll: {}, groupSearch: {}, showInactive: {},
   data: null, loading: true, error: null,
   syncing: false, syncMsg: null,
   settingsDraft: null,
 };
+
+/** Fabricas que o Bruno marcou como elegiveis mas o cliente nunca comprou. */
+function fabricasNuncaCompradas(entity) {
+  const compradas = (entity.fabricas || []).map(f => f.nome);
+  return (entity.fabricasElegiveis || []).filter(f => compradas.indexOf(f) < 0);
+}
+
+/** Lista de todas as fabricas conhecidas, montada a partir dos dados. */
+function todasFabricas() {
+  const s = new Set();
+  entities().forEach(e => {
+    (e.fabricas || []).forEach(f => s.add(f.nome));
+    (e.fabricasElegiveis || []).forEach(f => s.add(f));
+  });
+  return Array.from(s).filter(n => n && n !== '(sem fabrica)').sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
 
 function entities() { return (state.data && state.data.clients) || []; }
 
@@ -536,29 +608,85 @@ function renderHome() {
   `;
 }
 
+/* ===== Filtros e ordenacao ===== */
+
+const FILTROS = {
+  todos:        { label: 'Todos',         teste: () => true },
+  urgente:      { label: 'Urgentes',      teste: e => e.urgencia.cls === 'urgente' },
+  atencao:      { label: 'Atenção',       teste: e => e.urgencia.cls === 'atencao' },
+  emdia:        { label: 'Em dia',        teste: e => e.urgencia.cls === 'emdia' },
+  pendencias:   { label: 'Com pendência', teste: e => (e.pendencias || []).length > 0 },
+  showroom:     { label: 'Showroom ativo',teste: e => e.showroom && e.showroom.active },
+  oportunidade: { label: 'Oportunidade',  teste: e => fabricasNuncaCompradas(e).length > 0 },
+};
+
+const ORDENACOES = {
+  urgencia: { label: 'Urgência', fn: (a, b) => {
+    if (a.urgencia.rank !== b.urgencia.rank) return a.urgencia.rank - b.urgencia.rank;
+    return (b.dias ?? -1) - (a.dias ?? -1);
+  }},
+  valor:    { label: 'Maior faturamento', fn: (a, b) => (b.valorTotal || 0) - (a.valorTotal || 0) },
+  dias:     { label: 'Mais dias sem comprar', fn: (a, b) => (b.dias ?? -1) - (a.dias ?? -1) },
+  nome:     { label: 'Nome (A-Z)', fn: (a, b) => (a.nome || a.label).localeCompare(b.nome || b.label, 'pt-BR') },
+  pedidos:  { label: 'Mais pedidos', fn: (a, b) => ((b.faturamento && b.faturamento.pedidos) || 0) - ((a.faturamento && a.faturamento.pedidos) || 0) },
+};
+
+function aplicaFiltro(lista) {
+  const f = FILTROS[state.filtro] || FILTROS.todos;
+  return lista.filter(f.teste);
+}
+
+function aplicaOrdem(lista) {
+  const o = ORDENACOES[state.ordem] || ORDENACOES.urgencia;
+  return lista.slice().sort(o.fn);
+}
+
+function renderToolbar(lista) {
+  const chips = Object.keys(FILTROS).map(k => {
+    const qtd = k === 'todos' ? lista.length : lista.filter(FILTROS[k].teste).length;
+    if (k !== 'todos' && qtd === 0) return '';
+    return `<button class="filter-chip ${state.filtro === k ? 'on' : ''}" data-filtro="${k}">
+      ${FILTROS[k].label} <b>${qtd}</b></button>`;
+  }).join('');
+
+  const opts = Object.keys(ORDENACOES).map(k =>
+    `<option value="${k}" ${state.ordem === k ? 'selected' : ''}>${ORDENACOES[k].label}</option>`
+  ).join('');
+
+  return `<div class="toolbar">
+    ${chips}
+    <select class="sort-select" id="sort-select" title="Ordenar por">${opts}</select>
+  </div>`;
+}
+
 function renderCity(cdk) {
   const items = entities().filter(e => e.cdk === cdk);
   const cityMeta = items[0];
   let filtered = items;
   if (state.search) {
     const q = state.search.toLowerCase();
-    filtered = items.filter(e => e.label.toLowerCase().includes(q));
+    filtered = items.filter(e =>
+      (e.nome || '').toLowerCase().includes(q) ||
+      e.label.toLowerCase().includes(q) ||
+      (e.fantasia || '').toLowerCase().includes(q)
+    );
   }
 
   const active = [];
   const inactive = [];
   filtered.forEach(e => { if (e.urgencia.rank === 9) inactive.push(e); else active.push(e); });
-  active.sort((a, b) => {
-    if (a.urgencia.rank !== b.urgencia.rank) return a.urgencia.rank - b.urgencia.rank;
-    return (b.dias ?? -1) - (a.dias ?? -1);
-  });
-  inactive.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+  const visiveis = aplicaOrdem(aplicaFiltro(active));
+  inactive.sort((a, b) => (a.nome || a.label).localeCompare(b.nome || b.label, 'pt-BR'));
 
   const st = cityStats(cdk);
   const showInactive = !!state.showInactive[cdk];
 
-  const cards = active.map(e => renderCard(e)).join('');
+  const cards = visiveis.map(e => renderCard(e)).join('');
   const inactiveCards = inactive.map(e => renderCard(e)).join('');
+
+  const chip = (k, txt, n) =>
+    `<span class="stat-chip clicavel ${state.filtro === k ? 'on' : ''}" data-filtro="${k}"><b>${n}</b> ${txt}</span>`;
 
   return `
     ${renderTopbar()}
@@ -567,13 +695,14 @@ function renderCity(cdk) {
     </div>
     <h1>${cityMeta ? cityMeta.cd : ''} <span style="color:var(--ink-soft); font-weight:400;">/ ${cityMeta ? cityMeta.uf : ''}</span></h1>
     <div class="stats-strip">
-      <span class="stat-chip"><b>${st.total}</b> clientes</span>
-      <span class="stat-chip"><b>${st.urgentes}</b> urgentes</span>
-      <span class="stat-chip"><b>${st.pendencias}</b> pendências abertas</span>
+      ${chip('todos', 'clientes', st.total)}
+      ${chip('urgente', 'urgentes', st.urgentes)}
+      ${chip('pendencias', 'pendências abertas', st.pendencias)}
       ${st.inativos > 0 ? `<span class="stat-chip"><b>${st.inativos}</b> marcados inativos</span>` : ''}
     </div>
-    <input class="search-box" id="client-search" placeholder="Buscar cliente nesta cidade..." value="${state.search}">
-    ${cards || '<div class="empty-state">Nenhum cliente encontrado.</div>'}
+    <input class="search-box" id="client-search" placeholder="Buscar por nome, apelido ou razão social..." value="${state.search}">
+    ${renderToolbar(active)}
+    ${cards || '<div class="empty-state">Nenhum cliente com esse filtro.</div>'}
     ${inactive.length ? `<div class="inactive-toggle-line" id="toggle-inactive" data-city="${cdk}">${showInactive ? 'Ocultar' : 'Mostrar'} ${inactive.length} cliente(s) marcado(s) como inativo</div>` : ''}
     ${showInactive ? inactiveCards : ''}
   `;
@@ -641,27 +770,59 @@ function renderCard(entity) {
   const inactive = u.rank === 9;
   const valorTotal = entity.valorTotal;
 
+  const fat = entity.faturamento;
+  const nunca = fabricasNuncaCompradas(entity);
+  const nomePrincipal = entity.nome || entity.label;
+  const mostraRazao = nomePrincipal !== entity.label;
+
   return `<div class="client-card ${inactive ? 'is-inactive' : ''}" data-key="${encKey}">
     <div class="client-head">
       <div>
-        <div class="client-name">${entity.label} ${entity.isGroup ? `<span class="badge badge-group">🔗 ${entity.members.length} CNPJs agrupados</span>` : ''}</div>
+        <div class="client-name">${nomePrincipal} ${entity.isGroup ? `<span class="badge badge-group">🔗 ${entity.members.length} CNPJs agrupados</span>` : ''}</div>
+        ${mostraRazao ? `<div class="client-razao">${entity.label}</div>` : ''}
         <div class="client-sub">${entity.end || ''}${entity.tel ? ' · <a href="tel:' + entity.tel.replace(/[^\d+]/g, '') + '">' + entity.tel + '</a>' : ''}</div>
       </div>
       <div class="badges-row">
         <span class="badge badge-${u.cls}">${u.label}</span>
       </div>
     </div>
-    <div class="metrics-row">
-      <span>Situação Mercos: <b>${entity.sitDisplay}</b></span>
-      <span>Dias sem comprar: <b>${dias ?? '--'}</b></span>
-      <span>Ciclo médio: <b>${ciclo ?? '--'}</b> dias</span>
-      <span>Log: <b>${visitaCount}</b> visita(s) / <b>${escritorioCount}</b> escritório</span>
+
+    <div class="num-grid">
+      <div class="num-box">
+        <div class="num-lab">Faturamento total</div>
+        <div class="num-val">${fat ? fmtMoney(fat.total) : (valorTotal > 0 ? fmtMoney(valorTotal) : '--')}</div>
+        <div class="num-sub">${fat ? 'desde ' + fmtDate(fat.primeira) : 'histórico não importado'}</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Pedidos</div>
+        <div class="num-val">${fat ? fat.pedidos : '--'}</div>
+        <div class="num-sub">${fat ? 'ticket médio ' + fmtMoney(fat.ticketMedio) : ''}</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Dias sem comprar</div>
+        <div class="num-val">${dias ?? '--'}</div>
+        <div class="num-sub">ciclo médio ${ciclo ?? '--'} dias</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Posição na cidade</div>
+        <div class="num-val">${entity.cityRank ? entity.cityRank.pos + 'º' : '--'}</div>
+        <div class="num-sub">${entity.cityRank ? 'de ' + entity.cityRank.total + ' na cidade' : ''}</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Posição geral</div>
+        <div class="num-val">${entity.overallRank ? entity.overallRank + 'º' : '--'}</div>
+        <div class="num-sub">${entity.overallRank ? 'de ' + entity.overallTotal + ' na carteira' : ''}</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Situação Mercos</div>
+        <div class="num-val" style="font-size:13px;">${entity.sitDisplay}</div>
+        <div class="num-sub">${visitaCount} visita(s) / ${escritorioCount} escritório</div>
+      </div>
     </div>
     <div class="ranking-line">
-      📊 Posição na cidade: <b>${entity.cityRank ? entity.cityRank.pos + 'º de ' + entity.cityRank.total : '--'}</b>
-      &nbsp;·&nbsp; Posição geral: <b>${entity.overallRank ? entity.overallRank + 'º de ' + entity.overallTotal : '--'}</b>
-      &nbsp;·&nbsp; ${valorTotal > 0 ? fmtMoney(valorTotal) : 'sem valor conhecido'}
-      <br><small>Baseado no valor do último pedido do Mercos + pedidos registrados aqui no app.</small>
+      ${fat
+        ? `📊 Ranking por <b>faturamento acumulado</b>, somando todos os pedidos desde ${fmtDate(fat.primeira)}${entity.isGroup ? ' de todos os CNPJs do grupo' : ''}. Comissão gerada: <b>${fmtMoney(fat.comissao)}</b>.`
+        : `📊 Ranking ainda usando o valor do último pedido — o histórico completo não foi importado.`}
     </div>
     ${renderFieldActions(entity)}
     <div class="showroom-line">${sr.text}</div>
@@ -672,15 +833,77 @@ function renderCard(entity) {
     <div class="last-interaction">
       ${entries.length ? `Última interação: ${fmtDate(entries[0].date)} — ${entries[0].tipo === 'visita' ? 'Visita presencial' : 'Pedido escritório'}${entries[0].obs ? ' · ' + entries[0].obs : ''}` : 'Nenhuma interação registrada ainda.'}
     </div>
+    ${nunca.length ? `<div class="fab-alerta">
+      🎯 <b>Oportunidade:</b> ${nunca.join(', ')} ${nunca.length === 1 ? 'é elegível e nunca foi comprada' : 'são elegíveis e nunca foram compradas'} por este cliente.
+    </div>` : ''}
     <div class="card-actions">
       <button class="btn btn-primary" data-toggle-form="${encKey}">${formOpen ? 'Fechar' : '+ Registrar interação'}</button>
+      <button class="btn btn-ghost" data-toggle-fabricas="${encKey}">🏭 Fábricas${entity.fabricas && entity.fabricas.length ? ' (' + entity.fabricas.length + ')' : ''}</button>
+      <button class="btn btn-ghost" data-toggle-apelido="${encKey}">✏️ Apelido</button>
       ${entries.length ? `<button class="btn btn-ghost" data-toggle-history="${encKey}">${historyOpen ? 'Ocultar histórico' : 'Ver histórico (' + entries.length + ')'}</button>` : ''}
       <button class="btn btn-ghost" data-toggle-group="${encKey}">🔗 ${entity.isGroup ? 'Gerenciar CNPJs' : 'Agrupar CNPJ'}</button>
       <button class="btn ${inactive ? 'btn-ghost' : 'btn-warn'}" data-toggle-inactive="${encKey}">${inactive ? '▶ Reativar' : '⏸ Marcar inativo'}</button>
     </div>
+    ${state.openApelido === key ? renderApelido(entity) : ''}
+    ${state.openFabricas[key] ? renderFabricas(entity) : ''}
     ${formOpen ? renderForm(entity) : ''}
     ${historyOpen ? renderHistory(entries) : ''}
     ${groupPickerOpen ? renderGroupPanel(entity) : ''}
+  </div>`;
+}
+
+function renderApelido(entity) {
+  const encKey = encodeURIComponent(entity.logId);
+  return `<div class="apelido-box" data-apelido-key="${encKey}">
+    <div class="apelido-dica">
+      Como você chama esse cliente na rua. Vira o nome principal do card.
+      ${entity.isGroup ? 'Para grupos, vale algo como <b>Grupo Casa Bonita - Denize</b>.' : 'Ex: <b>Casa Bonita - Denize</b>.'}
+    </div>
+    <input type="text" class="f-apelido" maxlength="80"
+           placeholder="${entity.fantasia || entity.label}" value="${(entity.apelido || '').replace(/"/g, '&quot;')}">
+    <div class="form-actions">
+      <button class="btn btn-primary btn-sm" data-save-apelido="${encKey}">Salvar</button>
+      ${entity.apelido ? `<button class="btn btn-ghost btn-sm" data-clear-apelido="${encKey}">Remover apelido</button>` : ''}
+      <button class="btn btn-ghost btn-sm" data-cancel-apelido="1">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function renderFabricas(entity) {
+  const encKey = encodeURIComponent(entity.logId);
+  const compradas = entity.fabricas || [];
+  const mapa = {};
+  compradas.forEach(f => { mapa[f.nome] = f; });
+  const elegiveis = entity.fabricasElegiveis || [];
+  const lista = todasFabricas();
+
+  const tickets = lista.map(nome => {
+    const comprou = !!mapa[nome];
+    const elegivel = elegiveis.indexOf(nome) >= 0;
+    let cls = '';
+    if (comprou) cls = 'comprada';
+    else if (elegivel) cls = 'oportunidade';
+    const val = comprou
+      ? `<span class="val">${fmtMoney(mapa[nome].total)} · ${mapa[nome].pedidos}x</span>`
+      : (elegivel ? '<span class="val">nunca comprou</span>' : '');
+    const marca = elegivel ? '☑' : '☐';
+    return `<button class="fab-ticket ${cls}" data-fab="${encodeURIComponent(nome)}" data-fab-key="${encKey}">
+      ${marca} ${nome} ${val}</button>`;
+  }).join('');
+
+  const naoCompradas = elegiveis.filter(f => !mapa[f]);
+
+  return `<div class="fab-wrap" data-fabricas-key="${encKey}">
+    <div class="fab-titulo">Fábricas deste cliente</div>
+    <div class="fab-tickets">${tickets || '<span class="fab-legenda">Nenhuma fábrica conhecida ainda.</span>'}</div>
+    <div class="fab-legenda">
+      <b>Verde</b> = já comprou (valor e nº de pedidos no histórico).
+      <b>Vermelho</b> = você marcou como elegível mas ele nunca comprou — é a oportunidade.
+      Toque num ticket para marcar ou desmarcar como elegível.
+    </div>
+    ${naoCompradas.length ? `<div class="fab-alerta">
+      🎯 ${naoCompradas.length} fábrica(s) elegível(is) sem nenhuma compra: <b>${naoCompradas.join(', ')}</b>
+    </div>` : ''}
   </div>`;
 }
 
@@ -860,6 +1083,83 @@ function bindEvents() {
       const key = decodeURIComponent(btn.getAttribute('data-toggle-history'));
       state.openHistory[key] = !state.openHistory[key];
       render();
+    });
+  });
+
+  /* ---- filtros, chips e ordenacao ---- */
+  document.querySelectorAll('[data-filtro]').forEach(el => {
+    el.addEventListener('click', () => {
+      const f = el.getAttribute('data-filtro');
+      state.filtro = (state.filtro === f && f !== 'todos') ? 'todos' : f;
+      render();
+    });
+  });
+  const sortSel = document.getElementById('sort-select');
+  if (sortSel) {
+    sortSel.addEventListener('change', e => { state.ordem = e.target.value; render(); });
+  }
+
+  /* ---- apelido ---- */
+  document.querySelectorAll('[data-toggle-apelido]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-apelido'));
+      state.openApelido = (state.openApelido === key) ? null : key;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-cancel-apelido]').forEach(btn => {
+    btn.addEventListener('click', () => { state.openApelido = null; render(); });
+  });
+  document.querySelectorAll('[data-save-apelido]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-save-apelido'));
+      const box = btn.closest('.apelido-box');
+      const valor = box.querySelector('.f-apelido').value.trim();
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      try {
+        await postAndUpdate('/api/clients/' + encodeURIComponent(key) + '/apelido', { apelido: valor });
+        state.openApelido = null;
+        render();
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false; btn.textContent = 'Salvar';
+      }
+    });
+  });
+  document.querySelectorAll('[data-clear-apelido]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-clear-apelido'));
+      btn.disabled = true;
+      try {
+        await postAndUpdate('/api/clients/' + encodeURIComponent(key) + '/apelido', { apelido: '' });
+        state.openApelido = null;
+        render();
+      } catch (err) { alert(err.message); btn.disabled = false; }
+    });
+  });
+
+  /* ---- fabricas ---- */
+  document.querySelectorAll('[data-toggle-fabricas]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = decodeURIComponent(btn.getAttribute('data-toggle-fabricas'));
+      state.openFabricas[key] = !state.openFabricas[key];
+      render();
+    });
+  });
+  document.querySelectorAll('[data-fab]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = decodeURIComponent(btn.getAttribute('data-fab-key'));
+      const nome = decodeURIComponent(btn.getAttribute('data-fab'));
+      const ent = entities().find(e => e.logId === key);
+      if (!ent) return;
+      const atuais = (ent.fabricasElegiveis || []).slice();
+      const i = atuais.indexOf(nome);
+      if (i >= 0) atuais.splice(i, 1); else atuais.push(nome);
+      btn.disabled = true;
+      try {
+        await postAndUpdate('/api/clients/' + encodeURIComponent(key) + '/fabricas-elegiveis', { fabricas: atuais });
+        render();
+      } catch (err) { alert(err.message); btn.disabled = false; }
     });
   });
   document.querySelectorAll('[data-resolve]').forEach(btn => {
