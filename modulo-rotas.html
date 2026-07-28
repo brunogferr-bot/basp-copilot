@@ -466,17 +466,32 @@ async function loadData(showLoading) {
   render();
 }
 
+/**
+ * Recarrega os dados já sincronizados.
+ *
+ * NÃO chama mais /api/sync. Aquele endpoint dispara um robô no servidor que o
+ * Mercos bloqueia: ele exige código por e-mail quando o acesso vem de fora do
+ * Brasil, e o servidor fica nos EUA. O botão só mostrava um erro assustador.
+ *
+ * A sincronização de verdade roda pelo navegador já logado (tarefa agendada),
+ * e este botão traz o resultado mais recente dela.
+ */
 async function doSync() {
   state.syncing = true;
   state.syncMsg = null;
   render();
   try {
-    const res = await apiFetch('/api/sync', { method: 'POST' });
-    const s = res.summary || {};
-    state.syncMsg = { type: 'ok', text: `Sincronizado: ${s.added || 0} novo(s), ${s.updated || 0} atualizado(s), ${s.unchanged || 0} sem mudança.` };
+    const antes = state.data && state.data.meta ? state.data.meta.lastSync : null;
     await loadData(false);
+    const depois = state.data && state.data.meta ? state.data.meta.lastSync : null;
+    state.syncMsg = {
+      type: 'ok',
+      text: (antes && depois && antes !== depois)
+        ? 'Dados atualizados.'
+        : 'Você já está com os dados mais recentes (sincronizados em ' + fmtDateTime(depois) + ').',
+    };
   } catch (e) {
-    state.syncMsg = { type: 'error', text: 'Erro ao sincronizar: ' + e.message };
+    state.syncMsg = { type: 'error', text: 'Não consegui buscar os dados: ' + e.message };
   }
   state.syncing = false;
   render();
@@ -575,8 +590,8 @@ function renderTopbar() {
   return `<div class="topbar">
     <div class="brand">BASP Copilot<small>Módulo Rotas Inteligentes</small></div>
     <div class="topbar-actions">
-      <button class="sync-btn" id="btn-sync" ${state.syncing ? 'disabled' : ''}>
-        ${state.syncing ? '<span class="spin"></span> Sincronizando...' : '⟳ Atualizar'}
+      <button class="sync-btn" id="btn-sync" ${state.syncing ? 'disabled' : ''} title="Busca os dados mais recentes já sincronizados">
+        ${state.syncing ? '<span class="spin"></span> Buscando...' : '⟳ Atualizar'}
       </button>
       <button class="gear-btn" id="btn-gear" title="Configurar conexão">⚙</button>
     </div>
