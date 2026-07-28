@@ -303,6 +303,20 @@
     border-radius:6px; font-size:12.5px; color:#8a1f18;
   }
 
+  /* ===== FATURAMENTO POR FABRICA ===== */
+  .num-box.clicavel { cursor:pointer; transition: border-color .15s; }
+  .num-box.clicavel:hover { border-color: var(--gold); background:#fdf8ee; }
+  .num-seta { color: var(--gold); font-weight:700; }
+  .fab-linha { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .fab-linha:last-child { border-bottom: none; }
+  .fab-linha-topo { display:flex; align-items:baseline; gap:9px; }
+  .fab-pos { font-size:12px; color: var(--ink-soft); min-width:26px; font-weight:700; }
+  .fab-nome { flex:1; font-weight:600; font-size:14.5px; }
+  .fab-valor { font-weight:700; font-size:14.5px; white-space:nowrap; }
+  .fab-barra { height:6px; background:#efe6d2; border-radius:99px; margin:7px 0 5px 35px; overflow:hidden; }
+  .fab-barra span { display:block; height:100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+  .fab-linha-sub { font-size:11.5px; color: var(--ink-soft); margin-left:35px; }
+
   /* ===== CELULAR ===== */
   @media (max-width: 720px) {
     #app { padding: 14px 12px 80px; }
@@ -395,6 +409,7 @@ let state = {
   openForm: null, openHistory: {}, openGroupPicker: null,
   openApelido: null, openFabricas: {}, verTodasFabricas: {},
   filtro: 'todos', ordem: 'urgencia',
+  fabricasKey: null, periodoFab: 'tudo', voltarPara: null,
   groupSearchAll: {}, groupSearch: {}, showInactive: {},
   data: null, loading: true, error: null,
   syncing: false, syncMsg: null,
@@ -404,6 +419,33 @@ let state = {
 /** Fabricas que o Bruno arquivou (nao trabalha mais). So afeta a exibicao. */
 function arquivadasSet() {
   return new Set((state.data && state.data.fabricasArquivadas) || []);
+}
+
+/* ===== Semana corrente (segunda a domingo) ===== */
+
+function semanaAtual() {
+  const hoje = new Date();
+  const base = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+  const dow = base.getUTCDay();                 // 0 = domingo
+  const desdeSegunda = (dow === 0) ? 6 : dow - 1;
+  const ini = new Date(base); ini.setUTCDate(base.getUTCDate() - desdeSegunda);
+  const fim = new Date(ini);  fim.setUTCDate(ini.getUTCDate() + 6);
+  const iso = d => d.toISOString().slice(0, 10);
+  return { ini: iso(ini), fim: iso(fim) };
+}
+
+function rotuloSemana() {
+  const s = semanaAtual();
+  const br = i => i.slice(8, 10) + '/' + i.slice(5, 7);
+  return 'Visitadas ' + br(s.ini) + ' a ' + br(s.fim);
+}
+
+/** Visitas registradas nesta semana (segunda a domingo). */
+function visitasDaSemana(entity) {
+  const s = semanaAtual();
+  return (entity.entries || []).filter(e =>
+    e.tipo === 'visita' && e.date >= s.ini && e.date <= s.fim
+  );
 }
 
 /** Fabricas que o Bruno marcou como elegiveis mas o cliente nunca comprou. */
@@ -542,7 +584,11 @@ function render() {
     bindErrorEvents();
     return;
   }
-  if (state.screen === 'home') {
+  if (state.screen === 'semana') {
+    app.innerHTML = renderSemana();
+  } else if (state.screen === 'fabricas') {
+    app.innerHTML = renderTelaFabricas(state.fabricasKey);
+  } else if (state.screen === 'home') {
     app.innerHTML = renderHome();
   } else if (state.screen === 'city') {
     app.innerHTML = renderCity(state.cityKey);
@@ -628,6 +674,7 @@ function renderHome() {
       <span class="stat-chip"><b>${gs.cidades}</b> cidades</span>
       <span class="stat-chip"><b>${gs.urgentes}</b> urgentes hoje</span>
       <span class="stat-chip"><b>${gs.pendencias}</b> pendências abertas</span>
+      <span class="stat-chip clicavel" id="chip-semana"><b>${entities().filter(e => visitasDaSemana(e).length > 0).length}</b> ${rotuloSemana().toLowerCase()}</span>
     </div>
     <h1>Olá Bruno, qual cidade você está hoje?</h1>
     <div class="subtitle">Escolha a cidade para ver a carteira local: urgência de cada cliente, posição por tamanho de compra, última interação registrada e pendências em aberto.</div>
@@ -647,7 +694,13 @@ const FILTROS = {
   pendencias:   { label: 'Com pendência', teste: e => (e.pendencias || []).length > 0 },
   showroom:     { label: 'Showroom ativo',teste: e => e.showroom && e.showroom.active },
   oportunidade: { label: 'Oportunidade',  teste: e => fabricasNuncaCompradas(e).length > 0 },
+  semana:       { label: rotuloSemana,    teste: e => visitasDaSemana(e).length > 0, sempreVisivel: true },
 };
+
+function rotuloFiltro(k) {
+  const l = FILTROS[k].label;
+  return (typeof l === 'function') ? l() : l;
+}
 
 const ORDENACOES = {
   urgencia: { label: 'Urgência', fn: (a, b) => {
@@ -673,9 +726,9 @@ function aplicaOrdem(lista) {
 function renderToolbar(lista) {
   const chips = Object.keys(FILTROS).map(k => {
     const qtd = k === 'todos' ? lista.length : lista.filter(FILTROS[k].teste).length;
-    if (k !== 'todos' && qtd === 0) return '';
+    if (k !== 'todos' && qtd === 0 && !FILTROS[k].sempreVisivel) return '';
     return `<button class="filter-chip ${state.filtro === k ? 'on' : ''}" data-filtro="${k}">
-      ${FILTROS[k].label} <b>${qtd}</b></button>`;
+      ${rotuloFiltro(k)} <b>${qtd}</b></button>`;
   }).join('');
 
   const opts = Object.keys(ORDENACOES).map(k =>
@@ -686,6 +739,136 @@ function renderToolbar(lista) {
     ${chips}
     <select class="sort-select" id="sort-select" title="Ordenar por">${opts}</select>
   </div>`;
+}
+
+/* ===== Tela: lojas visitadas na semana (todas as cidades) ===== */
+
+function renderSemana() {
+  const s = semanaAtual();
+  const visitadas = entities()
+    .map(e => ({ e, vis: visitasDaSemana(e) }))
+    .filter(x => x.vis.length > 0)
+    .sort((a, b) => {
+      const da = a.vis[a.vis.length - 1].date, db = b.vis[b.vis.length - 1].date;
+      return db.localeCompare(da);
+    });
+
+  const comPedido = visitadas.filter(x => x.vis.some(v => v.pedido));
+  const valor = visitadas.reduce((soma, x) =>
+    soma + x.vis.reduce((s2, v) => s2 + (v.pedido && v.valor ? v.valor : 0), 0), 0);
+
+  const linhas = visitadas.map(x => {
+    const ult = x.vis[x.vis.length - 1];
+    const fechou = x.vis.some(v => v.pedido);
+    return `<div class="city-row" data-go-city="${x.e.cdk}">
+      <div>
+        <div class="name">${x.e.nome || x.e.label}</div>
+        <div class="meta">${x.e.cd}/${x.e.uf} · visita em ${fmtDate(ult.date)}${x.vis.length > 1 ? ' (' + x.vis.length + ' visitas)' : ''}</div>
+      </div>
+      <div>
+        ${fechou ? '<span class="badge badge-emdia">Fechou pedido</span>' : '<span class="badge badge-atencao">Sem pedido</span>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${renderTopbar()}
+    <div class="backbar"><button class="back-btn" id="btn-home">← Voltar</button></div>
+    <h1>Lojas visitadas na semana</h1>
+    <div class="subtitle">${fmtDate(s.ini)} a ${fmtDate(s.fim)}</div>
+    <div class="stats-strip">
+      <span class="stat-chip"><b>${visitadas.length}</b> lojas visitadas</span>
+      <span class="stat-chip"><b>${comPedido.length}</b> fecharam pedido</span>
+      <span class="stat-chip"><b>${fmtMoney(valor)}</b> registrado</span>
+    </div>
+    ${linhas || '<div class="empty-state">Nenhuma visita registrada nesta semana ainda. Conforme você registrar visitas, as lojas aparecem aqui.</div>'}
+  `;
+}
+
+/* ===== Tela: faturamento por fábrica de um cliente ===== */
+
+const PERIODOS = {
+  tudo:  { label: 'Desde o início', meses: null },
+  m12:   { label: 'Últimos 12 meses', meses: 12 },
+  m24:   { label: 'Últimos 24 meses', meses: 24 },
+  ano:   { label: 'Este ano', meses: 'ano' },
+};
+
+function mesesDoPeriodo(chave) {
+  const p = PERIODOS[chave] || PERIODOS.tudo;
+  if (!p.meses) return null;
+  const hoje = new Date();
+  if (p.meses === 'ano') return { de: hoje.getFullYear() + '-01', ate: '9999-99' };
+  const d = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth() - (p.meses - 1), 1));
+  return { de: d.toISOString().slice(0, 7), ate: '9999-99' };
+}
+
+/** Soma a fábrica no período pedido. Se não houver dado mensal, cai no total. */
+function totalFabricaNoPeriodo(fab, faixa) {
+  if (!faixa) return { total: fab.total, pedidos: fab.pedidos };
+  if (!fab.meses) return null;
+  let total = 0, pedidos = 0;
+  Object.keys(fab.meses).forEach(m => {
+    if (m >= faixa.de && m <= faixa.ate) {
+      total += fab.meses[m].v || 0;
+      pedidos += fab.meses[m].p || 0;
+    }
+  });
+  return { total: Math.round(total * 100) / 100, pedidos };
+}
+
+function renderTelaFabricas(logId) {
+  const e = entities().find(x => x.logId === logId);
+  if (!e) return '<div class="empty-state">Cliente não encontrado.</div>';
+
+  const per = state.periodoFab || 'tudo';
+  const faixa = mesesDoPeriodo(per);
+  const arquivadas = arquivadasSet();
+
+  const dados = (e.fabricas || [])
+    .filter(f => !arquivadas.has(f.nome))
+    .map(f => ({ f, calc: totalFabricaNoPeriodo(f, faixa) }))
+    .filter(x => x.calc && x.calc.total > 0)
+    .sort((a, b) => b.calc.total - a.calc.total);
+
+  const semDadoMensal = faixa && (e.fabricas || []).some(f => !f.meses);
+  const somaPeriodo = dados.reduce((s, x) => s + x.calc.total, 0);
+
+  const opts = Object.keys(PERIODOS).map(k =>
+    `<option value="${k}" ${per === k ? 'selected' : ''}>${PERIODOS[k].label}</option>`).join('');
+
+  const linhas = dados.map((x, i) => {
+    const pct = somaPeriodo > 0 ? (x.calc.total / somaPeriodo * 100) : 0;
+    return `<div class="fab-linha">
+      <div class="fab-linha-topo">
+        <span class="fab-pos">${i + 1}º</span>
+        <span class="fab-nome">${x.f.nome}</span>
+        <span class="fab-valor">${fmtMoney(x.calc.total)}</span>
+      </div>
+      <div class="fab-barra"><span style="width:${pct.toFixed(1)}%"></span></div>
+      <div class="fab-linha-sub">
+        ${pct.toFixed(1)}% do faturamento · ${x.calc.pedidos} pedido(s)
+        ${x.f.ultima ? ' · última compra ' + fmtDate(x.f.ultima) : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${renderTopbar()}
+    <div class="backbar"><button class="back-btn" id="btn-volta-cliente">← Voltar</button></div>
+    <h1>${e.nome || e.label}</h1>
+    <div class="subtitle">Faturamento acumulado por fábrica${e.isGroup ? ', somando os ' + e.members.length + ' CNPJs do grupo' : ''}.</div>
+    <div class="toolbar">
+      <span class="stat-chip"><b>${fmtMoney(somaPeriodo)}</b> no período</span>
+      <span class="stat-chip"><b>${dados.length}</b> fábrica(s)</span>
+      <select class="sort-select" id="periodo-fab">${opts}</select>
+    </div>
+    ${semDadoMensal ? `<div class="fab-alerta">
+      O filtro por período só vale para as fábricas já sincronizadas com detalhe mensal.
+      Rode uma sincronização para o histórico mês a mês ficar completo.
+    </div>` : ''}
+    ${linhas || '<div class="empty-state">Nenhuma compra neste período.</div>'}
+  `;
 }
 
 function renderCity(cdk) {
@@ -817,10 +1000,10 @@ function renderCard(entity) {
     </div>
 
     <div class="num-grid">
-      <div class="num-box">
-        <div class="num-lab">Faturamento total</div>
+      <div class="num-box ${fat ? 'clicavel' : ''}" ${fat ? `data-abrir-fabricas="${encKey}"` : ''}>
+        <div class="num-lab">Faturamento total ${fat ? '<span class="num-seta">›</span>' : ''}</div>
         <div class="num-val">${fat ? fmtMoney(fat.total) : (valorTotal > 0 ? fmtMoney(valorTotal) : '--')}</div>
-        <div class="num-sub">${fat ? 'desde ' + fmtDate(fat.primeira) : 'histórico não importado'}</div>
+        <div class="num-sub">${fat ? 'desde ' + fmtDate(fat.primeira) + ' · ver por fábrica' : 'histórico não importado'}</div>
       </div>
       <div class="num-box">
         <div class="num-lab">Pedidos</div>
@@ -1201,6 +1384,50 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       const key = decodeURIComponent(btn.getAttribute('data-toggle-fabricas'));
       state.openFabricas[key] = !state.openFabricas[key];
+      render();
+    });
+  });
+  const chipSemana = document.getElementById('chip-semana');
+  if (chipSemana) {
+    chipSemana.addEventListener('click', () => {
+      state.screen = 'semana';
+      window.scrollTo(0, 0);
+      render();
+    });
+  }
+  const btnHome = document.getElementById('btn-home');
+  if (btnHome) {
+    btnHome.addEventListener('click', () => { state.screen = 'home'; state.cityKey = null; render(); });
+  }
+  document.querySelectorAll('[data-abrir-fabricas]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.fabricasKey = decodeURIComponent(el.getAttribute('data-abrir-fabricas'));
+      state.voltarPara = { screen: state.screen, cityKey: state.cityKey };
+      state.screen = 'fabricas';
+      window.scrollTo(0, 0);
+      render();
+    });
+  });
+  const btnVoltaCliente = document.getElementById('btn-volta-cliente');
+  if (btnVoltaCliente) {
+    btnVoltaCliente.addEventListener('click', () => {
+      const v = state.voltarPara || { screen: 'home', cityKey: null };
+      state.screen = v.screen === 'fabricas' ? 'home' : v.screen;
+      state.cityKey = v.cityKey;
+      render();
+    });
+  }
+  const selPer = document.getElementById('periodo-fab');
+  if (selPer) {
+    selPer.addEventListener('change', e => { state.periodoFab = e.target.value; render(); });
+  }
+  document.querySelectorAll('[data-go-city]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.cityKey = el.getAttribute('data-go-city');
+      state.screen = 'city';
+      state.filtro = 'semana';
+      state.search = '';
+      window.scrollTo(0, 0);
       render();
     });
   });
