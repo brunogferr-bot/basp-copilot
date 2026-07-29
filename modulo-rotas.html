@@ -409,7 +409,7 @@ let state = {
   openForm: null, openHistory: {}, openGroupPicker: null,
   openApelido: null, openFabricas: {}, verTodasFabricas: {},
   filtro: 'todos', ordem: 'urgencia',
-  fabricasKey: null, periodoFab: 'tudo', voltarPara: null,
+  fabricasKey: null, periodoFab: 'tudo', voltarPara: null, fabDetalhe: {},
   groupSearchAll: {}, groupSearch: {}, showInactive: {},
   data: null, loading: true, error: null,
   syncing: false, syncMsg: null,
@@ -817,21 +817,48 @@ function totalFabricaNoPeriodo(fab, faixa) {
   return { total: Math.round(total * 100) / 100, pedidos };
 }
 
+/**
+ * Busca o detalhe mes a mes de UM cliente.
+ * Fica fora do /api/data porque o historico mensal de todos os clientes
+ * juntos deixava a carga inicial lenta demais no celular.
+ */
+async function carregarFabricasDetalhe(logId) {
+  if (state.fabDetalhe[logId]) return;
+  try {
+    const r = await apiFetch('/api/clients/' + encodeURIComponent(logId) + '/fabricas');
+    state.fabDetalhe[logId] = r.fabricas || [];
+  } catch (e) {
+    state.fabDetalhe[logId] = 'erro';
+  }
+  render();
+}
+
 function renderTelaFabricas(logId) {
   const e = entities().find(x => x.logId === logId);
   if (!e) return '<div class="empty-state">Cliente não encontrado.</div>';
 
+  const det = state.fabDetalhe[logId];
+  if (!det) {
+    carregarFabricasDetalhe(logId);
+    return `${renderTopbar()}
+      <div class="backbar"><button class="back-btn" id="btn-volta-cliente">← Voltar</button></div>
+      <h1>${e.nome || e.label}</h1>
+      <div class="center-screen"><div class="spinner-big"></div>
+      <div class="subtitle">Carregando o histórico por fábrica...</div></div>`;
+  }
+
   const per = state.periodoFab || 'tudo';
   const faixa = mesesDoPeriodo(per);
   const arquivadas = arquivadasSet();
+  const fonte = (det === 'erro') ? (e.fabricas || []) : det;
 
-  const dados = (e.fabricas || [])
+  const dados = (fonte || [])
     .filter(f => !arquivadas.has(f.nome))
     .map(f => ({ f, calc: totalFabricaNoPeriodo(f, faixa) }))
     .filter(x => x.calc && x.calc.total > 0)
     .sort((a, b) => b.calc.total - a.calc.total);
 
-  const semDadoMensal = faixa && (e.fabricas || []).some(f => !f.meses);
+  const semDadoMensal = faixa && (fonte || []).some(f => !f.meses);
   const somaPeriodo = dados.reduce((s, x) => s + x.calc.total, 0);
 
   const opts = Object.keys(PERIODOS).map(k =>
