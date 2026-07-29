@@ -695,6 +695,9 @@ const FILTROS = {
   showroom:     { label: 'Showroom ativo',teste: e => e.showroom && e.showroom.active },
   oportunidade: { label: 'Oportunidade',  teste: e => fabricasNuncaCompradas(e).length > 0 },
   semana:       { label: rotuloSemana,    teste: e => visitasDaSemana(e).length > 0, sempreVisivel: true },
+  // ciclo longo = a BASP pesa pouco naquela loja. E onde tem margem pra ganhar espaco.
+  crescer:      { label: 'Espaço p/ crescer', teste: e => e.ciclo != null && e.ciclo > 45 },
+  fieis:        { label: 'Compram sempre',    teste: e => e.ciclo != null && e.ciclo <= 21 },
 };
 
 function rotuloFiltro(k) {
@@ -709,6 +712,11 @@ const ORDENACOES = {
   }},
   valor:    { label: 'Maior faturamento', fn: (a, b) => (b.valorTotal || 0) - (a.valorTotal || 0) },
   dias:     { label: 'Mais dias sem comprar', fn: (a, b) => (b.dias ?? -1) - (a.dias ?? -1) },
+  atraso:   { label: 'Maior atraso no ciclo', fn: (a, b) => {
+    const at = x => (x.dias != null && x.ciclo != null) ? (x.dias - x.ciclo) : -99999;
+    return at(b) - at(a);
+  }},
+  ciclo:    { label: 'Maior espaço p/ crescer', fn: (a, b) => (b.ciclo ?? -1) - (a.ciclo ?? -1) },
   nome:     { label: 'Nome (A-Z)', fn: (a, b) => (a.nome || a.label).localeCompare(b.nome || b.label, 'pt-BR') },
   pedidos:  { label: 'Mais pedidos', fn: (a, b) => ((b.faturamento && b.faturamento.pedidos) || 0) - ((a.faturamento && a.faturamento.pedidos) || 0) },
 };
@@ -947,6 +955,35 @@ function renderCity(cdk) {
   `;
 }
 
+/* ===== Duas leituras diferentes, propositalmente separadas =====
+ * "Dias sem comprar" responde: esta na hora de visitar?
+ *   Base: o ultimo pedido do GRUPO (qualquer CNPJ).
+ * "Compra a cada" responde: qual o meu peso nessa loja?
+ *   Ciclo curto = escritorio relevante. Ciclo longo = participacao pequena
+ *   entre as fabricas dela, ou seja, espaco para crescer.
+ */
+
+function atrasoTexto(entity) {
+  const d = entity.dias, c = entity.ciclo;
+  if (d == null || c == null) return 'sem histórico de cadência';
+  const atraso = d - c;
+  if (atraso >= 30) return `<b style="color:var(--urgente)">${atraso} dias além do ciclo</b>`;
+  if (atraso >= 0) return `${atraso} dias além do ciclo`;
+  return `dentro do ciclo (faltam ${Math.abs(atraso)})`;
+}
+
+function participacaoTexto(entity) {
+  const c = entity.ciclo;
+  if (c == null) return 'sem pedidos suficientes';
+  const n = entity.pedidosNoCiclo || 0;
+  let leitura;
+  if (c <= 21) leitura = 'compra toda semana — escritório forte aqui';
+  else if (c <= 45) leitura = 'boa presença';
+  else if (c <= 90) leitura = 'espaço para crescer';
+  else leitura = 'participação baixa — muita margem';
+  return `${leitura}${n ? ' · ' + n + ' pedidos' : ''}`;
+}
+
 /* ===== Acoes de campo: ligar, WhatsApp e rota ===== */
 
 /** Pega o primeiro telefone utilizavel do campo do Mercos (que vem baguncado). */
@@ -1040,7 +1077,12 @@ function renderCard(entity) {
       <div class="num-box">
         <div class="num-lab">Dias sem comprar</div>
         <div class="num-val">${dias ?? '--'}</div>
-        <div class="num-sub">ciclo médio ${ciclo ?? '--'} dias</div>
+        <div class="num-sub">${atrasoTexto(entity)}</div>
+      </div>
+      <div class="num-box">
+        <div class="num-lab">Compra a cada</div>
+        <div class="num-val">${ciclo != null ? ciclo + ' dias' : '--'}</div>
+        <div class="num-sub">${participacaoTexto(entity)}</div>
       </div>
       <div class="num-box">
         <div class="num-lab">Posição na cidade</div>
