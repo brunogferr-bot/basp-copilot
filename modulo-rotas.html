@@ -421,17 +421,40 @@ function arquivadasSet() {
   return new Set((state.data && state.data.fabricasArquivadas) || []);
 }
 
+/* ===== Datas no fuso de Brasília =====
+ * BUG CORRIGIDO EM 29/07/2026: usar toISOString() para data de calendário
+ * converte para UTC. Depois das 21h em Brasília a UTC já virou o dia seguinte,
+ * e "dias sem comprar" aparecia com 1 dia a mais. Toda data de calendário
+ * neste arquivo tem que passar por hojeBR()/isoBR().
+ */
+const TZ_BR = 'America/Sao_Paulo';
+
+/** 'AAAA-MM-DD' de hoje em Brasília. */
+function hojeBR() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_BR, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+
+/** Date em UTC representando o dia de calendário de Brasília (meia-noite). */
+function hojeDateBR() {
+  const [y, m, d] = hojeBR().split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function isoBR(d) {
+  return d.toISOString().slice(0, 10);
+}
+
 /* ===== Semana corrente (segunda a domingo) ===== */
 
 function semanaAtual() {
-  const hoje = new Date();
-  const base = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+  const base = hojeDateBR();
   const dow = base.getUTCDay();                 // 0 = domingo
   const desdeSegunda = (dow === 0) ? 6 : dow - 1;
   const ini = new Date(base); ini.setUTCDate(base.getUTCDate() - desdeSegunda);
   const fim = new Date(ini);  fim.setUTCDate(ini.getUTCDate() + 6);
-  const iso = d => d.toISOString().slice(0, 10);
-  return { ini: iso(ini), fim: iso(fim) };
+  return { ini: isoBR(ini), fim: isoBR(fim) };
 }
 
 function rotuloSemana() {
@@ -805,9 +828,9 @@ const PERIODOS = {
 function mesesDoPeriodo(chave) {
   const p = PERIODOS[chave] || PERIODOS.tudo;
   if (!p.meses) return null;
-  const hoje = new Date();
-  if (p.meses === 'ano') return { de: hoje.getFullYear() + '-01', ate: '9999-99' };
-  const d = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth() - (p.meses - 1), 1));
+  const hoje = hojeDateBR();
+  if (p.meses === 'ano') return { de: hoje.getUTCFullYear() + '-01', ate: '9999-99' };
+  const d = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - (p.meses - 1), 1));
   return { de: d.toISOString().slice(0, 7), ate: '9999-99' };
 }
 
@@ -1218,8 +1241,7 @@ function renderFabricas(entity) {
 }
 
 function todayISO() {
-  const n = new Date();
-  return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())).toISOString().slice(0, 10);
+  return hojeBR();   // data de calendario de Brasilia, nunca UTC
 }
 
 function renderForm(entity) {
