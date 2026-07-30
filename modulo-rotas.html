@@ -317,6 +317,21 @@
   .fab-barra span { display:block; height:100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
   .fab-linha-sub { font-size:11.5px; color: var(--ink-soft); margin-left:35px; }
 
+  /* ===== ORCAMENTOS EM ABERTO ===== */
+  .orc-box { margin-top:10px; padding:10px 11px; background:#fbf9f4; border:1px solid var(--border);
+    border-radius:8px; }
+  .orc-titulo { font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:6px;
+    text-transform:uppercase; letter-spacing:.04em; }
+  .orc-linha { display:flex; gap:8px; align-items:baseline; font-size:12px; padding:3px 0;
+    color: var(--ink); flex-wrap:wrap; }
+  .orc-pv { color: var(--ink-soft); min-width:52px; }
+  .orc-fab { flex:1; min-width:100px; }
+  .orc-val { font-weight:600; }
+  .orc-idade { color: var(--ink-soft); font-size:11px; }
+  .orc-var { font-size:11px; color:var(--ink-soft); margin:-2px 0 6px 0; font-style:italic; }
+  .orc-mais { font-size:11.5px; color:var(--ink-soft); margin-top:4px; }
+  .orc-nota { font-size:11px; color:var(--ink-soft); margin-top:7px; font-style:italic; }
+
   /* ===== CELULAR ===== */
   @media (max-width: 720px) {
     #app { padding: 14px 12px 80px; }
@@ -721,6 +736,7 @@ const FILTROS = {
   // ciclo longo = a BASP pesa pouco naquela loja. E onde tem margem pra ganhar espaco.
   crescer:      { label: 'Espaço p/ crescer', teste: e => e.ciclo != null && e.ciclo > 45 },
   fieis:        { label: 'Compram sempre',    teste: e => e.ciclo != null && e.ciclo <= 21 },
+  decidindo:    { label: 'Decidindo agora',   teste: e => orcamentosVivos(e).length > 0 },
 };
 
 function rotuloFiltro(k) {
@@ -1007,6 +1023,85 @@ function participacaoTexto(entity) {
   return `${leitura}${n ? ' · ' + n + ' pedidos' : ''}`;
 }
 
+/* ===== Orcamentos em aberto =====
+ * Orcamento fica FORA de faturamento, ranking e ciclo.
+ *
+ * E deliberadamente DISCRETO, sem soma e sem cara de pipeline. Motivo (dito
+ * pelo Bruno): orcamento costuma ser variacao do MESMO negocio - ex: Ventura
+ * Interiores tem dois com os mesmos produtos, um com acabamento em couro e
+ * outro sem, para o lojista escolher um, outro ou nenhum. Somar os dois como
+ * se fossem vendas distintas infla a expectativa. Alem disso, orcamento que
+ * nao vira nada simplesmente morre pelo caminho - ninguem cancela um por um.
+ *
+ * O que ele realmente informa: este cliente esta decidindo agora, comparando
+ * inclusive com fabricas que a BASP nao representa. E hora de estar presente.
+ */
+
+/** Orcamentos com menos de 180 dias — acima disso a chance real e baixa. */
+function orcamentosVivos(entity) {
+  const limite = hojeDateBR();
+  limite.setUTCDate(limite.getUTCDate() - 180);
+  const corte = isoBR(limite);
+  return (entity.orcamentos || []).filter(o => o.data >= corte);
+}
+
+function diasDesde(iso) {
+  if (!iso) return null;
+  return Math.round((hojeDateBR() - new Date(iso + 'T00:00:00Z')) / 86400000);
+}
+
+/**
+ * Agrupa as variacoes do mesmo negocio (mesma fabrica, mesma data — o campo
+ * "variante" vem da API). Cada grupo conta como UM negocio, e o valor
+ * mostrado e uma faixa "de X a Y", nunca a soma: no maximo uma variacao fecha.
+ */
+function orcamentosNegocios(entity) {
+  const abertos = orcamentosVivos(entity);
+  const grupos = [];
+  const idx = {};
+  abertos.forEach(o => {
+    if (!o.variante) { grupos.push({ itens: [o] }); return; }
+    if (idx[o.variante] == null) { idx[o.variante] = grupos.length; grupos.push({ itens: [] }); }
+    grupos[idx[o.variante]].itens.push(o);
+  });
+  return grupos;
+}
+
+function renderOrcamentos(entity) {
+  const negocios = orcamentosNegocios(entity);
+  if (!negocios.length) return '';
+  const maisNovo = diasDesde(negocios[0].itens[0].data);
+
+  const linhas = negocios.slice(0, 3).map(g => {
+    const p = g.itens[0];
+    const d = diasDesde(p.data);
+    const pvs = g.itens.map(i => '#' + i.pv).join(' / ');
+    let valor;
+    if (g.itens.length > 1) {
+      const vals = g.itens.map(i => i.valor || 0).sort((a, b) => a - b);
+      valor = `${fmtMoney(vals[0])} ou ${fmtMoney(vals[vals.length - 1])}`;
+    } else {
+      valor = fmtMoney(p.valor);
+    }
+    return `<div class="orc-linha">
+      <span class="orc-pv">${pvs}</span>
+      <span class="orc-fab">${p.fabrica || ''}</span>
+      <span class="orc-val">${valor}</span>
+      <span class="orc-idade">há ${d}d</span>
+    </div>${g.itens.length > 1
+      ? `<div class="orc-var">${g.itens.length} versões do mesmo negócio — fecha uma, ou nenhuma</div>`
+      : ''}`;
+  }).join('');
+
+  const n = negocios.length;
+  return `<div class="orc-box">
+    <div class="orc-titulo">${n} negócio(s) em orçamento${maisNovo != null ? ' · último há ' + maisNovo + ' dia(s)' : ''}</div>
+    ${linhas}
+    ${n > 3 ? `<div class="orc-mais">+ ${n - 3} outro(s)</div>` : ''}
+    <div class="orc-nota">Orçamento não é venda e não entra no faturamento.</div>
+  </div>`;
+}
+
 /* ===== Acoes de campo: ligar, WhatsApp e rota ===== */
 
 /** Pega o primeiro telefone utilizavel do campo do Mercos (que vem baguncado). */
@@ -1137,6 +1232,7 @@ function renderCard(entity) {
     <div class="last-interaction">
       ${entries.length ? `Última interação: ${fmtDate(entries[0].date)} — ${entries[0].tipo === 'visita' ? 'Visita presencial' : 'Pedido escritório'}${entries[0].obs ? ' · ' + entries[0].obs : ''}` : 'Nenhuma interação registrada ainda.'}
     </div>
+    ${renderOrcamentos(entity)}
     ${nunca.length ? `<div class="fab-alerta">
       🎯 <b>Oportunidade:</b> ${nunca.join(', ')} ${nunca.length === 1 ? 'é elegível e nunca foi comprada' : 'são elegíveis e nunca foram compradas'} por este cliente.
     </div>` : ''}
