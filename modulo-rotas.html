@@ -318,6 +318,17 @@
   .fab-linha-sub { font-size:11.5px; color: var(--ink-soft); margin-left:35px; }
 
 
+  /* ===== SYNC NA NUVEM ===== */
+  .nuvem { margin:10px 0 4px; padding:9px 11px; border:1px solid var(--border); border-radius:9px;
+    background:#fbf9f4; font-size:12.5px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .nuvem b { font-weight:600; }
+  .nuvem .ponto { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .nuvem .ok { background:#2f7d4f; }
+  .nuvem .ruim { background:#b3341f; }
+  .nuvem .neutro { background:#b9a77f; }
+  .nuvem-msg { flex:1 1 100%; color:var(--ink-soft); }
+  .nuvem input { padding:7px 9px; border:1px solid var(--border); border-radius:7px; font-size:16px; width:120px; }
+
   /* ===== CELULAR ===== */
   @media (max-width: 720px) {
     #app { padding: 14px 12px 80px; }
@@ -413,7 +424,7 @@ let state = {
   fabricasKey: null, periodoFab: 'tudo', voltarPara: null, fabDetalhe: {},
   groupSearchAll: {}, groupSearch: {}, showInactive: {},
   data: null, loading: true, error: null,
-  syncing: false, syncMsg: null,
+  syncing: false, syncMsg: null, nuvem: null,
   settingsDraft: null,
 };
 
@@ -530,6 +541,8 @@ async function loadData(showLoading) {
   }
   state.loading = false;
   render();
+  // status do sync na nuvem em segundo plano, sem travar a tela
+  carregarNuvem().catch(() => {});
 }
 
 /**
@@ -655,6 +668,74 @@ function renderSettings(first) {
   </div>`;
 }
 
+/* ===== Sync na nuvem, 3x por dia =====
+ * Quem atualiza e o GitHub Actions chamando /api/sync-incremental. Nao depende
+ * de PC ligado. O servidor faz o proprio login no Mercos; este painel so mostra
+ * o estado e, nas raras vezes em que o Mercos pede o codigo do e-mail, oferece
+ * o campo para confirmar uma vez.
+ */
+function renderNuvem() {
+  const n = state.nuvem;
+  if (!n) return '';
+  if (n.erro) {
+    return `<div class="nuvem"><span class="ponto ruim"></span>
+      <b>Sync na nuvem</b> <span class="nuvem-msg">${n.erro}</span>
+      <button class="btn btn-ghost btn-sm" id="btn-relogar">Tentar conectar</button></div>`;
+  }
+  if (n.aguardandoCodigo) {
+    return `<div class="nuvem"><span class="ponto neutro"></span>
+      <b>O Mercos pediu um código por e-mail</b>
+      <input id="inp-codigo" inputmode="numeric" placeholder="código" autocomplete="one-time-code">
+      <button class="btn btn-primary btn-sm" id="btn-codigo">Confirmar</button>
+      <span class="nuvem-msg">Isso acontece uma vez. Depois o servidor entra sozinho, 3x por dia.</span>
+    </div>`;
+  }
+  const viva = n.temSessao && n.viva;
+  return `<div class="nuvem">
+    <span class="ponto ${viva ? 'ok' : 'ruim'}"></span>
+    <b>Sync na nuvem</b>
+    <span>${viva ? 'conectado ao Mercos' : 'sem conexão com o Mercos'}</span>
+    ${n.ultimoSync ? `<span class="nuvem-msg">Último ciclo automático: ${fmtDateTime(n.ultimoSync)}${
+      n.janela ? ` · janela ${n.janela.corte} a ${n.janela.ate}` : ''}</span>` : ''}
+    ${viva ? '' : '<button class="btn btn-primary btn-sm" id="btn-relogar">Conectar agora</button>'}
+  </div>`;
+}
+
+async function carregarNuvem() {
+  try {
+    const r = await apiFetch('/api/sessao/status');
+    state.nuvem = r;
+  } catch (e) {
+    state.nuvem = { erro: e.message };
+  }
+  render();
+}
+
+async function relogarNuvem() {
+  state.nuvem = { erro: 'Conectando ao Mercos...' };
+  render();
+  try {
+    const r = await apiFetch('/api/sessao/login', { method: 'POST', body: '{}' });
+    if (r.precisaCodigo) state.nuvem = { aguardandoCodigo: true };
+    else await carregarNuvem();
+  } catch (e) {
+    state.nuvem = { erro: e.message };
+  }
+  render();
+}
+
+async function confirmarCodigo(codigo) {
+  state.nuvem = { erro: 'Confirmando o código...' };
+  render();
+  try {
+    await apiFetch('/api/sessao/codigo', { method: 'POST', body: JSON.stringify({ codigo }) });
+    await carregarNuvem();
+  } catch (e) {
+    state.nuvem = { aguardandoCodigo: true, erro: e.message };
+    render();
+  }
+}
+
 function renderTopbar() {
   const meta = state.data && state.data.meta;
   return `<div class="topbar">
@@ -667,6 +748,7 @@ function renderTopbar() {
     </div>
   </div>
   <div class="last-sync-note">Última sincronização com o Mercos: ${meta ? fmtDateTime(meta.lastSync) : '--'}</div>
+  ${renderNuvem()}
   ${state.syncMsg ? `<div class="${state.syncMsg.type === 'ok' ? 'sync-summary' : 'sync-error'}">${state.syncMsg.text}</div>` : ''}`;
 }
 
@@ -1394,6 +1476,14 @@ function bindEvents() {
 
   const syncBtn = document.getElementById('btn-sync');
   if (syncBtn) syncBtn.addEventListener('click', () => doSync());
+  const relogarBtn = document.getElementById('btn-relogar');
+  if (relogarBtn) relogarBtn.addEventListener('click', () => relogarNuvem());
+  const codigoBtn = document.getElementById('btn-codigo');
+  if (codigoBtn) codigoBtn.addEventListener('click', () => {
+    const v = (document.getElementById('inp-codigo') || {}).value;
+    if (v && String(v).trim()) confirmarCodigo(String(v).trim());
+  });
+
   const gearBtn = document.getElementById('btn-gear');
   if (gearBtn) gearBtn.addEventListener('click', () => openSettings());
 
