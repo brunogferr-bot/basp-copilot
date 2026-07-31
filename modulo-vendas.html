@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BASP · Análise de Vendas</title>
+<style>
+  :root{
+    --bg:#faf7f0; --card:#fffdf8; --ink:#241f19; --ink-soft:#7d7263;
+    --border:#e6ddc9; --gold:#b8934f; --gold-light:#d9bd82;
+    --up:#2f7d4f; --down:#b3341f; --flat:#8a8069; --new:#1a6a8f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+  #app{max-width:1000px;margin:0 auto;padding:18px 18px 90px}
+  a{color:inherit}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .brand{font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .brand small{display:block;font-size:12px;font-weight:500;color:var(--ink-soft);letter-spacing:.02em}
+  .btn{border:1px solid var(--border);background:var(--card);color:var(--ink);
+    padding:8px 13px;border-radius:8px;font-size:13.5px;cursor:pointer;font-family:inherit}
+  .btn:hover{border-color:var(--gold)}
+  .btn-primary{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+  .btn-sm{padding:5px 10px;font-size:12.5px}
+  .nota{font-size:12px;color:var(--ink-soft);margin-top:8px}
+
+  .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+  .rbox{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 13px}
+  .rbox .rot{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft)}
+  .rbox .val{font-size:19px;font-weight:700;margin-top:3px}
+  .rbox .sub{font-size:12px;color:var(--ink-soft)}
+
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}
+  .chip{border:1px solid var(--border);background:var(--card);border-radius:99px;
+    padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .chip.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+
+  .fcard{background:var(--card);border:1px solid var(--border);border-radius:11px;
+    padding:13px 15px;margin-bottom:10px;cursor:pointer}
+  .fcard:hover{border-color:var(--gold)}
+  .fcard-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .fnome{font-weight:700;font-size:15.5px}
+  .fvar{font-weight:700;font-size:15px;white-space:nowrap}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)} .new{color:var(--new)}
+  .fsub{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
+  .barra{height:6px;background:#efe6d2;border-radius:99px;margin-top:9px;overflow:hidden;display:flex}
+  .barra i{display:block;height:100%}
+  .barra .a{background:linear-gradient(90deg,var(--gold),var(--gold-light))}
+  .barra .b{background:#d8cdb4}
+  .selo{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;
+    border:1px solid var(--border);color:var(--ink-soft);margin-left:6px}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:600}
+  td.num,th.num{text-align:right;white-space:nowrap}
+  tr.clicavel{cursor:pointer}
+  tr.clicavel:hover td{background:#fdf9ef}
+
+  .sec{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px 16px;margin:12px 0}
+  .sec h3{margin:0 0 4px;font-size:14px;letter-spacing:.01em}
+  .sec .desc{font-size:12.5px;color:var(--ink-soft);margin-bottom:8px}
+  .lista{font-size:13.5px}
+  .lista div{padding:5px 0;border-bottom:1px solid var(--border)}
+  .lista div:last-child{border-bottom:0}
+  .lista .cid{color:var(--ink-soft);font-size:12px}
+
+  .acao{border-left:3px solid var(--gold);background:#fffdf6;border-radius:0 9px 9px 0;
+    padding:11px 14px;margin-bottom:10px}
+  .acao h4{margin:0 0 5px;font-size:14px}
+  .acao p{margin:0 0 7px;font-size:13.5px}
+  .pensador{font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--border);padding-top:6px}
+  .pensador b{color:var(--ink)}
+  .urg{border-left-color:var(--down)}
+  .opo{border-left-color:var(--new)}
+
+  .pf{display:inline-flex;gap:4px}
+  .pf b{cursor:pointer;user-select:none;border:1px solid var(--border);background:var(--card);
+    border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;color:var(--ink-soft)}
+  .pf b.on{background:var(--gold);border-color:var(--gold);color:#fff}
+  .sug{font-size:11.5px;color:var(--ink-soft)}
+  .sug em{font-style:normal;color:var(--gold)}
+  .salvar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;border-top:1px solid var(--border);
+    display:flex;gap:10px;align-items:center}
+  .vazio{color:var(--ink-soft);font-size:13.5px;padding:10px 0}
+  .carregando{text-align:center;padding:50px 0;color:var(--ink-soft)}
+  .erro{background:#fdeceb;border:1px solid #e8b4ac;color:#8c2a1a;
+    padding:12px 14px;border-radius:9px;font-size:13.5px}
+
+  @media (max-width:720px){
+    #app{padding:14px 12px 80px}
+    .brand{font-size:17px}
+    table{font-size:12.5px}
+    th,td{padding:7px 4px}
+    .esconde-cel{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="carregando">Carregando a análise…</div></div>
+
+<script>
+/* =====================================================================
+ * BASP Copilot - MODULO ANALISE DE VENDAS
+ *
+ * Modulo proprio, no mesmo nivel de Rotas e Marketing - nao e um anexo do
+ * Rotas. A primeira visao e por fabrica; o modulo nasceu para crescer
+ * (produto, vendedor, sazonalidade) sem mexer no Rotas.
+ *
+ * Responde: qual fabrica esta crescendo, qual esta caindo, EM QUE CIDADE
+ * isso acontece, com QUAL lojista - e o que fazer.
+ *
+ * A conta pesada (12 meses contra os 12 anteriores, mes a mes, por fabrica e
+ * por cidade) roda no servidor, em /api/fabricas/analise. Aqui e so leitura e
+ * decisao.
+ *
+ * O plano de acao NAO e texto decorativo: cada recomendacao nasce de uma regra
+ * sobre os numeros desta fabrica, e vem ancorada em quem pensou aquilo antes.
+ * ===================================================================== */
+
+const DEFAULT_API_BASE = 'https://basp-rotas-api.onrender.com';
+const API_BASE_KEY = 'basp_rotas_api_base_v1';
+const API_TOKEN_KEY = 'basp_rotas_api_token_v1';
+
+function getApiBase() { return localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE; }
+function getApiToken() { return (localStorage.getItem(API_TOKEN_KEY) || '').trim(); }
+
+async function apiFetch(path) {
+  const base = getApiBase().replace(/\/$/, '');
+  const res = await fetch(base + path, {
+    headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+  });
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  if (!res.ok) throw new Error((body && body.error) || ('Erro ' + res.status + ' ao falar com o servidor.'));
+  return body;
+}
+
+const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
+  perfis: null, rascunho: null, salvando: false, msg: null };
+
+/* ---------- formatacao ---------- */
+const fmtMoney = (n) => (n == null ? '--' :
+  'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const fmtCurto = (n) => {
+  if (n == null) return '--';
+  const v = Number(n);
+  if (Math.abs(v) >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi';
+  if (Math.abs(v) >= 1e3) return 'R$ ' + (v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' mil';
+  return fmtMoney(v);
+};
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function classeTend(t) {
+  return t === 'crescimento' ? 'up' : t === 'queda' || t === 'parou' ? 'down'
+    : t === 'nova' ? 'new' : 'flat';
+}
+function textoVar(f) {
+  if (f.tendencia === 'nova') return 'nova';
+  if (f.tendencia === 'parou') return 'parou';
+  if (f.variacao == null) return '--';
+  return (f.variacao > 0 ? '+' : '') + f.variacao.toLocaleString('pt-BR') + '%';
+}
+
+/* =====================================================================
+ * PLANO DE ACAO
+ *
+ * Cada regra olha um numero real desta fabrica e devolve uma recomendacao.
+ * A atribuicao e honesta: o que esta entre aspas e citacao; o resto e o
+ * princípio do autor resumido em uma linha. Nao invento frase de ninguem.
+ * ===================================================================== */
+
+function planoDaFabrica(f) {
+  const acoes = [];
+  const perdidos = f.perdidos || [];
+  const quedas = f.quedas || [];
+  const novos = f.novos || [];
+  const oport = f.oportunidades || [];
+  const cidadesEmQueda = (f.cidades || []).filter((c) => c.tendencia === 'queda' || c.tendencia === 'parou');
+  const cidadesCrescendo = (f.cidades || []).filter((c) => c.tendencia === 'crescimento' || c.tendencia === 'nova');
+  const perdaReais = perdidos.reduce((s, p) => s + (p.anterior || 0), 0)
+    + quedas.reduce((s, p) => s + ((p.anterior || 0) - (p.atual || 0)), 0);
+
+  /* 1. Encarar o número antes de explicá-lo */
+  if (f.tendencia === 'queda' || f.tendencia === 'parou') {
+    acoes.push({
+      tipo: 'urg',
+      titulo: 'Encare a queda antes de justificá-la',
+      texto: `Esta fábrica caiu de ${fmtMoney(f.total12ant)} para ${fmtMoney(f.total12)} — `
+        + `${textoVar(f)} em 12 meses. Antes de falar em mercado, crise ou preço, `
+        + `identifique <b>onde exatamente</b> o dinheiro sumiu: são `
+        + `${perdidos.length} loja(s) que pararam e ${quedas.length} que reduziram forte. `
+        + `Isso dá ${fmtMoney(perdaReais)} de perda rastreável. O resto é hipótese.`,
+      autor: 'Jack Welch',
+      frase: '"Encare a realidade como ela é, não como você gostaria que fosse."',
+      contexto: 'GE. Diagnóstico honesto antes de plano de ação.',
+    });
+  }
+
+  /* 2. Recuperar quem parou custa menos que conquistar */
+  if (perdidos.length) {
+    const top = perdidos.slice(0, 3).map((p) => `${p.cliente} (${fmtCurto(p.anterior)})`).join(', ');
+    acoes.push({
+      tipo: 'urg',
+      titulo: `${perdidos.length} loja(s) compravam e pararam`,
+      texto: `Maiores: ${esc(top)}. Estas lojas já conheciam o produto, já tinham `
+        + `mostruário e já tinham vendido. Recuperar cliente que parou custa uma fração `
+        + `de abrir cliente novo — e a conversa começa de um lugar melhor: "sumiu por quê?".`,
+      autor: 'Marcelo Caetano',
+      frase: null,
+      contexto: 'Gestão de carteira: crescer dentro da carteira que já se tem é o caminho mais barato de crescimento.',
+    });
+  }
+
+  /* 3. Perguntar em vez de argumentar */
+  if (quedas.length) {
+    acoes.push({
+      tipo: '',
+      titulo: `${quedas.length} loja(s) reduziram mais de 30%`,
+      texto: 'Queda sem parada costuma ser troca de fornecedor em silêncio — a loja '
+        + 'substituiu parte do mix. Não chegue defendendo a fábrica. Pergunte o que mudou '
+        + 'na exposição, o que entrou no lugar e o que o consumidor final passou a pedir. '
+        + 'Deixe o lojista dimensionar o próprio problema em voz alta.',
+      autor: 'Neil Rackham',
+      frase: null,
+      contexto: 'SPIN Selling: em venda complexa, perguntas de implicação vendem mais que argumentos.',
+    });
+  }
+
+  /* 4. Oportunidade concreta: elegível que nunca comprou */
+  if (oport.length) {
+    const cidades = [...new Set(oport.map((o) => o.cidade))].slice(0, 4).join(', ');
+    acoes.push({
+      tipo: 'opo',
+      titulo: `${oport.length} loja(s) marcadas como elegíveis e que nunca compraram`,
+      texto: `Concentradas em ${esc(cidades)}. Você já disse que esta fábrica cabe nessas lojas — `
+        + 'falta a conversa. Não chegue com catálogo: chegue com o que você aprendeu vendendo '
+        + 'esta fábrica em lojas parecidas na mesma praça. Informação que o lojista não tem vale '
+        + 'mais que desconto.',
+      autor: 'Matthew Dixon e Brent Adamson',
+      frase: null,
+      contexto: 'The Challenger Sale: o vendedor que mais vende é o que ensina algo novo sobre o negócio do cliente.',
+    });
+  }
+
+  /* 5. Onde está crescendo: repetir o que funciona */
+  if (cidadesCrescendo.length && f.total12 > 0) {
+    const c = cidadesCrescendo[0];
+    acoes.push({
+      tipo: '',
+      titulo: `${esc(c.cidade)} está puxando para cima`,
+      texto: `${esc(c.cidade)} fez ${fmtMoney(c.total12)} contra ${fmtMoney(c.total12ant)}. `
+        + 'Antes de tentar consertar a praça ruim, descubra o que está sendo feito de diferente '
+        + 'aqui — que produto puxa, que argumento pega, que prazo destrava — e leve isso '
+        + 'para as outras cidades. Padrão que funciona se copia.',
+      autor: 'Raul Candeloro',
+      frase: null,
+      contexto: 'Gestão de vendas por indicadores: medir para descobrir o que repetir.',
+    });
+  }
+
+  /* 6. Cidade em queda com carteira viva */
+  if (cidadesEmQueda.length) {
+    const c = cidadesEmQueda[0];
+    acoes.push({
+      tipo: 'urg',
+      titulo: `${esc(c.cidade)} está drenando o resultado`,
+      texto: `${esc(c.cidade)}: ${fmtMoney(c.total12)} contra ${fmtMoney(c.total12ant)}. `
+        + `${c.perdidos.length} loja(s) pararam nesta praça. Uma cidade inteira caindo raramente `
+        + 'é coincidência de lojistas — costuma ser concorrente novo, ruptura de entrega ou '
+        + 'mostruário envelhecido. Vá até lá com hipótese, não com planilha.',
+      autor: 'John H. Patterson',
+      frase: null,
+      contexto: 'NCR, fim do século 19: criou território, cota e roteiro de visita — vender é gestão de praça, não de sorte.',
+    });
+  }
+
+  /* 7. Fábrica sem entrada de cliente novo */
+  if (!novos.length && f.total12 > 0) {
+    acoes.push({
+      tipo: '',
+      titulo: 'Nenhuma loja nova em 12 meses',
+      texto: 'Esta fábrica está vivendo exclusivamente da base atual. Toda carteira perde '
+        + 'clientes por motivos que não dependem de você — mudança de dono, fechamento, '
+        + 'reposicionamento. Sem entrada nova, a curva só tem um caminho. '
+        + 'O vazio de prospecção de hoje é a queda de faturamento daqui a seis meses.',
+      autor: 'Jeb Blount',
+      frase: null,
+      contexto: 'Fanatical Prospecting: prospecção é atividade diária, não campanha de emergência.',
+    });
+  }
+
+  /* 8. Concentração de risco */
+  if (f.clientes12 > 0 && f.clientes12 <= 3 && f.total12 > 0) {
+    acoes.push({
+      tipo: 'urg',
+      titulo: `Faturamento concentrado em ${f.clientes12} loja(s)`,
+      texto: 'Se uma dessas lojas parar, a fábrica inteira despenca na sua carteira. '
+        + 'Concentração assim não é força de relacionamento, é fragilidade estrutural. '
+        + 'Vale abrir pelo menos duas lojas novas antes que a decisão seja tomada por você.',
+      autor: 'Aaron Ross',
+      frase: null,
+      contexto: 'Predictable Revenue: receita previsível vem de processo de entrada, não de poucos grandes contratos.',
+    });
+  }
+
+  /* 9. Ticket e a tentação do desconto */
+  if (f.pedidos12 > 0) {
+    acoes.push({
+      tipo: '',
+      titulo: `Ticket médio de ${fmtMoney(f.ticket12)} em ${f.pedidos12} pedido(s)`,
+      texto: 'Quando a fábrica pressiona por volume, o caminho curto é desconto — e desconto '
+        + 'come a comissão antes de comer a margem da fábrica. O caminho longo é mix: '
+        + 'mais itens no mesmo pedido, com o mesmo frete e a mesma visita.',
+      autor: 'Thiago Concer',
+      frase: null,
+      contexto: 'Princípio recorrente: desconto é a saída de quem não construiu valor antes.',
+    });
+  }
+
+  /* 10. O elo humano */
+  acoes.push({
+    tipo: '',
+    titulo: 'A visita antes do pedido',
+    texto: 'O lojista não decide sozinho pelo catálogo: decide pela confiança em quem atende. '
+      + 'Numa representação, sua vantagem sobre a fábrica que vende direto é justamente estar '
+      + 'na loja, conhecer a vitrine e saber o que encalhou.',
+    autor: 'Jeffrey Gitomer',
+    frase: '"As pessoas não gostam que vendam para elas, mas adoram comprar."',
+    contexto: 'Complementado por Dale Carnegie: interesse sincero pelo negócio do outro abre mais portas que técnica.',
+  });
+
+  return acoes;
+}
+
+function renderAcoes(acoes) {
+  if (!acoes.length) return '<div class="vazio">Sem recomendação para esta fábrica.</div>';
+  return acoes.map((a) => `
+    <div class="acao ${a.tipo}">
+      <h4>${a.titulo}</h4>
+      <p>${a.texto}</p>
+      <div class="pensador">
+        <b>${esc(a.autor)}</b>${a.frase ? ' — ' + esc(a.frase) : ''}
+        ${a.contexto ? '<br>' + esc(a.contexto) : ''}
+      </div>
+    </div>`).join('');
+}
+
+/* ---------- telas ---------- */
+
+const FILTROS = {
+  todas:       { rot: 'Todas',            ok: () => true },
+  crescimento: { rot: 'Em crescimento',   ok: (f) => f.tendencia === 'crescimento' || f.tendencia === 'nova' },
+  queda:       { rot: 'Em queda',         ok: (f) => f.tendencia === 'queda' },
+  parou:       { rot: 'Pararam',          ok: (f) => f.tendencia === 'parou' },
+  oport:       { rot: 'Com oportunidade', ok: (f) => (f.oportunidades || []).length > 0 },
+  perdas:      { rot: 'Perderam loja',    ok: (f) => (f.perdidos || []).length > 0 },
+};
+
+function renderTopo() {
+  return `<div class="topbar">
+    <div class="brand">BASP Copilot<small>Análise de Vendas</small></div>
+    <div>
+      <a class="btn btn-sm" href="./index.html">← Módulos</a>
+      <button class="btn btn-sm" id="btn-perfis">👥 Perfis</button>
+      <button class="btn btn-sm" id="btn-recarregar">⟳ Atualizar</button>
+    </div>
+  </div>`;
+}
+
+/* ===== Perfis: alto padrão x médio padrão =====
+ * Marcar fábrica por cliente seriam 240 x 23 = mais de 5 mil decisões. Aqui são
+ * 263: o perfil de cada lado. A elegibilidade vira o cruzamento dos dois.
+ * Os dois lados aceitam A e B ao mesmo tempo - loja grande tem dois pisos,
+ * fábrica tem duas linhas.
+ */
+function chaveP(tipo, id) { return tipo + '|' + id; }
+
+function valorPerfil(tipo, item) {
+  const r = state.rascunho || {};
+  const k = chaveP(tipo, tipo === 'fab' ? item.nome : item.logId);
+  if (r[k] !== undefined) return r[k];
+  return item.atual || item.sugerido || [];
+}
+
+function botoesPerfil(tipo, item, nomes) {
+  const v = valorPerfil(tipo, item);
+  const id = tipo === 'fab' ? item.nome : item.logId;
+  return `<span class="pf" data-tipo="${tipo}" data-id="${encodeURIComponent(id)}">
+    <b class="${v.includes('A') ? 'on' : ''}" data-p="A" title="${esc(nomes.A)}">A</b>
+    <b class="${v.includes('B') ? 'on' : ''}" data-p="B" title="${esc(nomes.B)}">B</b>
+  </span>`;
+}
+
+function renderPerfis() {
+  const p = state.perfis;
+  if (!p) return `${renderTopo()}<div class="carregando">Carregando os perfis…</div>`;
+  const nomes = p.nomes || { A: 'Alto padrão', B: 'Médio padrão' };
+
+  const linha = (tipo, item) => `<tr>
+    <td>${esc(tipo === 'fab' ? item.nome : item.nome)}</td>
+    <td class="num esconde-cel">${fmtCurto(item.ticket)}</td>
+    <td class="num"><span class="sug">${item.atual ? 'marcado' : '<em>sugerido</em>'}</span></td>
+    <td class="num">${botoesPerfil(tipo, item, nomes)}</td>
+  </tr>`;
+
+  return `${renderTopo()}
+  <div style="margin:14px 0 6px"><button class="btn btn-sm" id="btn-voltar">← Fábricas</button></div>
+  <h2 style="margin:8px 0 2px;font-size:21px">Perfis de cliente e fábrica</h2>
+
+  <div class="sec">
+    <div class="desc" style="margin:0">
+      <b>A = ${esc(nomes.A)}</b> · <b>B = ${esc(nomes.B)}</b>. Pode marcar os dois — loja com
+      dois pisos, fábrica com duas linhas.<br>
+      Com isso, oportunidade só aparece quando a fábrica cabe no perfil da loja.
+      Loja de alto padrão comprando fábrica de médio padrão não vira cobrança: é
+      <b>venda corporativa</b> (obra, clínica, apartamento decorado), um canal à parte.<br>
+      <span class="sug">Sugestão pelo ticket médio real. Corte: ${fmtCurto(p.referencia.medianaFabricas)}
+      nas fábricas, ${fmtCurto(p.referencia.medianaClientes)} nos clientes. ${esc(p.referencia.regra)}</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>Fábricas (${p.fabricas.length})</h3>
+    <table><tr><th>Fábrica</th><th class="num esconde-cel">Ticket</th><th class="num">Estado</th><th class="num">Perfil</th></tr>
+    ${p.fabricas.map((f) => linha('fab', f)).join('')}</table>
+  </div>
+
+  <div class="sec">
+    <h3>Clientes (${p.clientes.length})</h3>
+    <div class="desc">Ordenados por ticket médio — os de cima são os candidatos naturais a alto padrão.</div>
+    <table><tr><th>Cliente</th><th class="num esconde-cel">Ticket</th><th class="num">Estado</th><th class="num">Perfil</th></tr>
+    ${p.clientes.map((c) => linha('cli', c)).join('')}</table>
+  </div>
+
+  <div class="salvar">
+    <button class="btn btn-primary" id="btn-salvar-perfis" ${state.salvando ? 'disabled' : ''}>
+      ${state.salvando ? 'Salvando…' : 'Salvar perfis'}</button>
+    <span class="sug">${Object.keys(state.rascunho || {}).length} alteração(ões) não salva(s)</span>
+    ${state.msg ? `<span class="sug">${esc(state.msg)}</span>` : ''}
+  </div>`;
+}
+
+async function carregarPerfis() {
+  state.perfis = null; render();
+  try { state.perfis = await apiFetch('/api/perfis'); state.rascunho = {}; }
+  catch (e) { state.erro = e.message; }
+  render();
+}
+
+async function salvarPerfis() {
+  state.salvando = true; state.msg = null; render();
+  const fabricas = {}, clientes = {};
+  Object.keys(state.rascunho || {}).forEach((k) => {
+    const [tipo, id] = k.split('|');
+    (tipo === 'fab' ? fabricas : clientes)[id] = state.rascunho[k];
+  });
+  try {
+    const base = getApiBase().replace(/\/$/, '');
+    const r = await fetch(base + '/api/perfis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+      body: JSON.stringify({ fabricas, clientes }),
+    });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b.error || 'falhou');
+    state.msg = `salvo: ${b.fabricas} fábricas, ${b.clientes} clientes`;
+    state.rascunho = {};
+    state.dados = null; // a análise muda com o perfil
+  } catch (e) { state.msg = 'erro: ' + e.message; }
+  state.salvando = false; render();
+}
+
+function renderLista() {
+  const d = state.dados;
+  const r = d.resumo;
+  const varGeral = r.total12ant ? Math.round(((r.total12 - r.total12ant) / r.total12ant) * 1000) / 10 : null;
+  const cls = varGeral == null ? 'flat' : varGeral > 0 ? 'up' : varGeral < 0 ? 'down' : 'flat';
+
+  const fabs = d.fabricas.filter((f) => !f.arquivada).filter(FILTROS[state.filtro].ok);
+  const maior = Math.max(1, ...d.fabricas.map((f) => Math.max(f.total12, f.total12ant)));
+
+  const cards = fabs.map((f) => {
+    const larguraA = Math.round((f.total12 / maior) * 100);
+    const larguraB = Math.round((f.total12ant / maior) * 100);
+    const sinais = [];
+    if ((f.perdidos || []).length) sinais.push(`${f.perdidos.length} pararam`);
+    if ((f.quedas || []).length) sinais.push(`${f.quedas.length} caindo`);
+    if ((f.novos || []).length) sinais.push(`${f.novos.length} novas`);
+    if ((f.oportunidades || []).length) sinais.push(`${f.oportunidades.length} oportunidades`);
+    return `<div class="fcard" data-fab="${encodeURIComponent(f.nome)}">
+      <div class="fcard-top">
+        <span class="fnome">${esc(f.nome)}</span>
+        <span class="fvar ${classeTend(f.tendencia)}">${textoVar(f)}</span>
+      </div>
+      <div class="fsub">
+        ${fmtMoney(f.total12)} <span class="esconde-cel">nos últimos 12 meses</span>
+        · antes ${fmtCurto(f.total12ant)}
+        · ${f.clientes12} loja(s)
+      </div>
+      <div class="barra"><i class="a" style="width:${larguraA}%"></i></div>
+      <div class="barra"><i class="b" style="width:${larguraB}%"></i></div>
+      ${sinais.length ? `<div class="fsub">${sinais.join(' · ')}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `${renderTopo()}
+  <div class="resumo">
+    <div class="rbox"><div class="rot">Últimos 12 meses</div>
+      <div class="val">${fmtCurto(r.total12)}</div>
+      <div class="sub ${cls}">${varGeral == null ? '--' : (varGeral > 0 ? '+' : '') + varGeral + '% vs 12 anteriores'}</div></div>
+    <div class="rbox"><div class="rot">12 meses anteriores</div>
+      <div class="val">${fmtCurto(r.total12ant)}</div>
+      <div class="sub">base de comparação</div></div>
+    <div class="rbox"><div class="rot">Em crescimento</div>
+      <div class="val up">${r.emCrescimento}</div>
+      <div class="sub">de ${r.fabricas} fábricas</div></div>
+    <div class="rbox"><div class="rot">Em queda</div>
+      <div class="val down">${r.emQueda}${r.pararam ? ' + ' + r.pararam : ''}</div>
+      <div class="sub">${r.pararam ? r.pararam + ' pararam de vender' : 'queda acima de 15%'}</div></div>
+  </div>
+
+  <div class="chips">
+    ${Object.keys(FILTROS).map((k) =>
+      `<span class="chip ${state.filtro === k ? 'on' : ''}" data-filtro="${k}">${FILTROS[k].rot}</span>`).join('')}
+  </div>
+
+  ${cards || '<div class="vazio">Nenhuma fábrica neste filtro.</div>'}
+  <div class="nota">Janela: ${esc(d.janela.atual[0])} a ${esc(d.janela.atual[1])}
+    contra ${esc(d.janela.anterior[0])} a ${esc(d.janela.anterior[1])}.
+    Fábricas arquivadas ficam fora. Orçamento não entra — só pedido de verdade.</div>`;
+}
+
+function renderFabrica() {
+  const f = state.dados.fabricas.find((x) => x.nome === state.fabrica);
+  if (!f) { state.tela = 'lista'; return renderLista(); }
+
+  const linhasCidade = (f.cidades || []).map((c) => `
+    <tr class="clicavel" data-cidade="${encodeURIComponent(c.cidade + '|' + c.uf)}">
+      <td>${esc(c.cidade)}<span class="cid"> ${esc(c.uf)}</span></td>
+      <td class="num">${fmtCurto(c.total12)}</td>
+      <td class="num esconde-cel">${fmtCurto(c.total12ant)}</td>
+      <td class="num ${classeTend(c.tendencia)}">${textoVar(c)}</td>
+      <td class="num">${c.clientes12}</td>
+      <td class="num">${c.perdidos.length || ''}</td>
+      <td class="num">${c.oportunidades.length || ''}</td>
+    </tr>`).join('');
+
+  const listinha = (arr, campo) => arr.length
+    ? arr.map((x) => `<div>${esc(x.cliente)} <span class="cid">${esc(x.cidade)}${x.uf ? '/' + esc(x.uf) : ''}</span>
+        ${campo ? '<span class="cid"> · ' + campo(x) + '</span>' : ''}</div>`).join('')
+    : '<div class="vazio">Nada aqui.</div>';
+
+  return `${renderTopo()}
+  <div style="margin:14px 0 6px"><button class="btn btn-sm" id="btn-voltar">← Todas as fábricas</button></div>
+  <h2 style="margin:8px 0 2px;font-size:21px">${esc(f.nome)}
+    ${f.arquivada ? '<span class="selo">arquivada</span>' : ''}</h2>
+
+  <div class="resumo">
+    <div class="rbox"><div class="rot">12 meses</div><div class="val">${fmtCurto(f.total12)}</div>
+      <div class="sub ${classeTend(f.tendencia)}">${textoVar(f)} vs anterior</div></div>
+    <div class="rbox"><div class="rot">Lojas ativas</div><div class="val">${f.clientes12}</div>
+      <div class="sub">antes eram ${f.clientes12ant}</div></div>
+    <div class="rbox"><div class="rot">Ticket médio</div><div class="val">${fmtCurto(f.ticket12)}</div>
+      <div class="sub">${f.pedidos12} pedido(s)</div></div>
+    <div class="rbox"><div class="rot">Histórico total</div><div class="val">${fmtCurto(f.totalHistorico)}</div>
+      <div class="sub">desde o primeiro pedido</div></div>
+  </div>
+
+  <div class="sec">
+    <h3>Cidade a cidade</h3>
+    <div class="desc">Toque numa cidade para ver nome por nome o que fazer lá.</div>
+    ${linhasCidade ? `<table>
+      <tr><th>Cidade</th><th class="num">12m</th><th class="num esconde-cel">Antes</th>
+        <th class="num">Var.</th><th class="num">Lojas</th><th class="num">Pararam</th><th class="num">Oport.</th></tr>
+      ${linhasCidade}</table>` : '<div class="vazio">Sem histórico por cidade.</div>'}
+  </div>
+
+  <div class="sec">
+    <h3>Plano de ação</h3>
+    <div class="desc">Gerado a partir dos números acima. Entre aspas é citação; o resto é o princípio do autor resumido.</div>
+    ${renderAcoes(planoDaFabrica(f))}
+  </div>
+
+  <div class="sec">
+    <h3>Pararam de comprar (${(f.perdidos || []).length})</h3>
+    <div class="desc">Compravam nos 12 meses anteriores e não compraram nos últimos 12.</div>
+    <div class="lista">${listinha(f.perdidos || [], (x) => 'fazia ' + fmtCurto(x.anterior))}</div>
+  </div>
+
+  <div class="sec">
+    <h3>Caíram forte (${(f.quedas || []).length})</h3>
+    <div class="desc">Continuam comprando, mas reduziram mais de 30%.</div>
+    <div class="lista">${listinha(f.quedas || [], (x) => fmtCurto(x.anterior) + ' → ' + fmtCurto(x.atual))}</div>
+  </div>
+
+  <div class="sec">
+    <h3>Lojas novas (${(f.novos || []).length})</h3>
+    <div class="desc">Não compravam antes e passaram a comprar.</div>
+    <div class="lista">${listinha(f.novos || [], (x) => fmtCurto(x.atual))}</div>
+  </div>
+
+  <div class="sec">
+    <h3>Oportunidades marcadas (${(f.oportunidades || []).length})</h3>
+    <div class="desc">Você marcou esta fábrica como elegível para estas lojas, e elas nunca compraram.</div>
+    <div class="lista">${listinha(f.oportunidades || [], null)}</div>
+  </div>
+
+  ${f.semMeses ? '<div class="nota">Parte do histórico desta fábrica não tem detalhe mês a mês — '
+    + 'os totais de 12 meses podem estar subestimados até a próxima extração completa.</div>' : ''}`;
+}
+
+function renderCidade() {
+  const f = state.dados.fabricas.find((x) => x.nome === state.fabrica);
+  const c = f && (f.cidades || []).find((x) => (x.cidade + '|' + x.uf) === state.cidade);
+  if (!c) { state.tela = 'fabrica'; return renderFabrica(); }
+
+  const lista = (arr) => arr.length
+    ? arr.map((x) => `<div>${esc(x.cliente)}${x.anterior != null
+        ? ` <span class="cid">fazia ${fmtCurto(x.anterior)}</span>` : ''}</div>`).join('')
+    : '<div class="vazio">Nada aqui.</div>';
+
+  return `${renderTopo()}
+  <div style="margin:14px 0 6px"><button class="btn btn-sm" id="btn-voltar-fab">← ${esc(f.nome)}</button></div>
+  <h2 style="margin:8px 0 2px;font-size:21px">${esc(c.cidade)} <span class="cid">${esc(c.uf)}</span></h2>
+  <div class="fsub">${esc(f.nome)} nesta praça</div>
+
+  <div class="resumo">
+    <div class="rbox"><div class="rot">12 meses</div><div class="val">${fmtCurto(c.total12)}</div>
+      <div class="sub ${classeTend(c.tendencia)}">${textoVar(c)}</div></div>
+    <div class="rbox"><div class="rot">12 anteriores</div><div class="val">${fmtCurto(c.total12ant)}</div>
+      <div class="sub">base</div></div>
+    <div class="rbox"><div class="rot">Lojas ativas</div><div class="val">${c.clientes12}</div>
+      <div class="sub">antes ${c.clientes12ant}</div></div>
+  </div>
+
+  <div class="sec">
+    <h3>O que fazer aqui</h3>
+    <div class="desc">Duas listas, dois telefonemas diferentes.</div>
+    <p style="font-size:13.5px;margin:6px 0 4px"><b>Pararam de comprar</b> — a conversa começa por
+      "sumiu por quê?", não por catálogo:</p>
+    <div class="lista">${lista(c.perdidos)}</div>
+    <p style="font-size:13.5px;margin:14px 0 4px"><b>Elegíveis que nunca compraram</b> — chegue com o que
+      funcionou em loja parecida desta mesma praça:</p>
+    <div class="lista">${lista(c.oportunidades)}</div>
+  </div>`;
+}
+
+/* ---------- ciclo ---------- */
+
+function render() {
+  const app = document.getElementById('app');
+  if (state.erro) {
+    app.innerHTML = `${renderTopo()}<div class="erro" style="margin-top:16px">${esc(state.erro)}</div>
+      <div class="nota">Se aparecer "Token inválido", abra o Módulo Rotas uma vez neste aparelho —
+      é lá que o token fica guardado.</div>`;
+    ligar();
+    return;
+  }
+  if (!state.dados) { app.innerHTML = '<div class="carregando">Carregando a análise…</div>'; return; }
+  if (state.tela === 'perfis') { app.innerHTML = renderPerfis(); ligar(); return; }
+  if (!state.dados) { carregar(); return; }
+  app.innerHTML = state.tela === 'cidade' ? renderCidade()
+    : state.tela === 'fabrica' ? renderFabrica() : renderLista();
+  ligar();
+}
+
+function ligar() {
+  const rec = document.getElementById('btn-recarregar');
+  if (rec) rec.addEventListener('click', () => carregar());
+  const bp = document.getElementById('btn-perfis');
+  if (bp) bp.addEventListener('click', () => { state.tela = 'perfis'; window.scrollTo(0,0); carregarPerfis(); });
+  const sp = document.getElementById('btn-salvar-perfis');
+  if (sp) sp.addEventListener('click', () => salvarPerfis());
+  document.querySelectorAll('.pf b').forEach((el) => {
+    el.addEventListener('click', () => {
+      const span = el.parentElement;
+      const tipo = span.getAttribute('data-tipo');
+      const id = decodeURIComponent(span.getAttribute('data-id'));
+      const p = el.getAttribute('data-p');
+      const lista = state.perfis[tipo === 'fab' ? 'fabricas' : 'clientes'];
+      const item = lista.find((x) => (tipo === 'fab' ? x.nome : x.logId) === id);
+      const atual = valorPerfil(tipo, item).slice();
+      const i = atual.indexOf(p);
+      if (i >= 0) atual.splice(i, 1); else atual.push(p);
+      state.rascunho[chaveP(tipo, id)] = atual;
+      render();
+    });
+  });
+  const volt = document.getElementById('btn-voltar');
+  if (volt) volt.addEventListener('click', () => { state.tela = 'lista'; state.fabrica = null; render(); });
+  const voltF = document.getElementById('btn-voltar-fab');
+  if (voltF) voltF.addEventListener('click', () => { state.tela = 'fabrica'; state.cidade = null; render(); });
+
+  document.querySelectorAll('[data-filtro]').forEach((el) => {
+    el.addEventListener('click', () => { state.filtro = el.getAttribute('data-filtro'); render(); });
+  });
+  document.querySelectorAll('[data-fab]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.fabrica = decodeURIComponent(el.getAttribute('data-fab'));
+      state.tela = 'fabrica'; window.scrollTo(0, 0); render();
+    });
+  });
+  document.querySelectorAll('[data-cidade]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.cidade = decodeURIComponent(el.getAttribute('data-cidade'));
+      state.tela = 'cidade'; window.scrollTo(0, 0); render();
+    });
+  });
+}
+
+async function carregar() {
+  state.erro = null; state.dados = null; render();
+  try {
+    state.dados = await apiFetch('/api/fabricas/analise');
+  } catch (e) {
+    state.erro = e.message || 'Não foi possível carregar a análise.';
+  }
+  render();
+}
+
+carregar();
+</script>
+</body>
+</html>

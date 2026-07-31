@@ -715,8 +715,15 @@ function renderNuvem() {
   const n = state.nuvem;
   if (!n) return '';
   if (n.erro) {
+    // NUNCA despejar texto tecnico aqui. Em 31/07/2026 o painel chegou a
+    // mostrar o HTML da pagina de login do Mercos no meio da tela do Bruno.
+    // Mensagem de erro na tela de quem esta na rua tem que caber numa linha.
+    const bruto = String(n.erro);
+    const curto = /autentic|c[oó]digo|confirma/i.test(bruto)
+      ? 'O Mercos exige confirmação por e-mail para entrar de fora da sua rede. A atualização automática está pausada.'
+      : (bruto.length > 120 ? bruto.slice(0, 120) + '…' : bruto);
     return `<div class="nuvem"><span class="ponto ruim"></span>
-      <b>Sync na nuvem</b> <span class="nuvem-msg">${n.erro}</span>
+      <b>Sync na nuvem pausado</b> <span class="nuvem-msg">${curto}</span>
       <button class="btn btn-ghost btn-sm" id="btn-relogar">Tentar conectar</button></div>`;
   }
   if (n.aguardandoCodigo) {
@@ -781,8 +788,6 @@ function renderTopbar() {
       <button class="sync-btn" id="btn-sync" ${state.syncing ? 'disabled' : ''} title="Busca os dados mais recentes já sincronizados">
         ${state.syncing ? '<span class="spin"></span> Buscando...' : '⟳ Atualizar'}
       </button>
-      <a class="sync-btn" href="./modulo-fabricas.html" title="Análise por fábrica, cidade a cidade"
-        style="text-decoration:none;display:inline-flex;align-items:center">🏭 Fábricas</a>
       <button class="gear-btn" id="btn-gear" title="Configurar conexão">⚙</button>
     </div>
   </div>
