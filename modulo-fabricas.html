@@ -77,6 +77,14 @@
   .urg{border-left-color:var(--down)}
   .opo{border-left-color:var(--new)}
 
+  .pf{display:inline-flex;gap:4px}
+  .pf b{cursor:pointer;user-select:none;border:1px solid var(--border);background:var(--card);
+    border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;color:var(--ink-soft)}
+  .pf b.on{background:var(--gold);border-color:var(--gold);color:#fff}
+  .sug{font-size:11.5px;color:var(--ink-soft)}
+  .sug em{font-style:normal;color:var(--gold)}
+  .salvar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;border-top:1px solid var(--border);
+    display:flex;gap:10px;align-items:center}
   .vazio{color:var(--ink-soft);font-size:13.5px;padding:10px 0}
   .carregando{text-align:center;padding:50px 0;color:var(--ink-soft)}
   .erro{background:#fdeceb;border:1px solid #e8b4ac;color:#8c2a1a;
@@ -127,7 +135,8 @@ async function apiFetch(path) {
   return body;
 }
 
-const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas' };
+const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
+  perfis: null, rascunho: null, salvando: false, msg: null };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -353,9 +362,113 @@ function renderTopo() {
     <div class="brand">BASP Copilot<small>Inteligência de Fábricas</small></div>
     <div>
       <a class="btn btn-sm" href="./modulo-rotas.html">← Rotas</a>
+      <button class="btn btn-sm" id="btn-perfis">👥 Perfis</button>
       <button class="btn btn-sm" id="btn-recarregar">⟳ Atualizar</button>
     </div>
   </div>`;
+}
+
+/* ===== Perfis: alto padrão x médio padrão =====
+ * Marcar fábrica por cliente seriam 240 x 23 = mais de 5 mil decisões. Aqui são
+ * 263: o perfil de cada lado. A elegibilidade vira o cruzamento dos dois.
+ * Os dois lados aceitam A e B ao mesmo tempo - loja grande tem dois pisos,
+ * fábrica tem duas linhas.
+ */
+function chaveP(tipo, id) { return tipo + '|' + id; }
+
+function valorPerfil(tipo, item) {
+  const r = state.rascunho || {};
+  const k = chaveP(tipo, tipo === 'fab' ? item.nome : item.logId);
+  if (r[k] !== undefined) return r[k];
+  return item.atual || item.sugerido || [];
+}
+
+function botoesPerfil(tipo, item, nomes) {
+  const v = valorPerfil(tipo, item);
+  const id = tipo === 'fab' ? item.nome : item.logId;
+  return `<span class="pf" data-tipo="${tipo}" data-id="${encodeURIComponent(id)}">
+    <b class="${v.includes('A') ? 'on' : ''}" data-p="A" title="${esc(nomes.A)}">A</b>
+    <b class="${v.includes('B') ? 'on' : ''}" data-p="B" title="${esc(nomes.B)}">B</b>
+  </span>`;
+}
+
+function renderPerfis() {
+  const p = state.perfis;
+  if (!p) return `${renderTopo()}<div class="carregando">Carregando os perfis…</div>`;
+  const nomes = p.nomes || { A: 'Alto padrão', B: 'Médio padrão' };
+
+  const linha = (tipo, item) => `<tr>
+    <td>${esc(tipo === 'fab' ? item.nome : item.nome)}</td>
+    <td class="num esconde-cel">${fmtCurto(item.ticket)}</td>
+    <td class="num"><span class="sug">${item.atual ? 'marcado' : '<em>sugerido</em>'}</span></td>
+    <td class="num">${botoesPerfil(tipo, item, nomes)}</td>
+  </tr>`;
+
+  return `${renderTopo()}
+  <div style="margin:14px 0 6px"><button class="btn btn-sm" id="btn-voltar">← Fábricas</button></div>
+  <h2 style="margin:8px 0 2px;font-size:21px">Perfis de cliente e fábrica</h2>
+
+  <div class="sec">
+    <div class="desc" style="margin:0">
+      <b>A = ${esc(nomes.A)}</b> · <b>B = ${esc(nomes.B)}</b>. Pode marcar os dois — loja com
+      dois pisos, fábrica com duas linhas.<br>
+      Com isso, oportunidade só aparece quando a fábrica cabe no perfil da loja.
+      Loja de alto padrão comprando fábrica de médio padrão não vira cobrança: é
+      <b>venda corporativa</b> (obra, clínica, apartamento decorado), um canal à parte.<br>
+      <span class="sug">Sugestão pelo ticket médio real. Corte: ${fmtCurto(p.referencia.medianaFabricas)}
+      nas fábricas, ${fmtCurto(p.referencia.medianaClientes)} nos clientes. ${esc(p.referencia.regra)}</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>Fábricas (${p.fabricas.length})</h3>
+    <table><tr><th>Fábrica</th><th class="num esconde-cel">Ticket</th><th class="num">Estado</th><th class="num">Perfil</th></tr>
+    ${p.fabricas.map((f) => linha('fab', f)).join('')}</table>
+  </div>
+
+  <div class="sec">
+    <h3>Clientes (${p.clientes.length})</h3>
+    <div class="desc">Ordenados por ticket médio — os de cima são os candidatos naturais a alto padrão.</div>
+    <table><tr><th>Cliente</th><th class="num esconde-cel">Ticket</th><th class="num">Estado</th><th class="num">Perfil</th></tr>
+    ${p.clientes.map((c) => linha('cli', c)).join('')}</table>
+  </div>
+
+  <div class="salvar">
+    <button class="btn btn-primary" id="btn-salvar-perfis" ${state.salvando ? 'disabled' : ''}>
+      ${state.salvando ? 'Salvando…' : 'Salvar perfis'}</button>
+    <span class="sug">${Object.keys(state.rascunho || {}).length} alteração(ões) não salva(s)</span>
+    ${state.msg ? `<span class="sug">${esc(state.msg)}</span>` : ''}
+  </div>`;
+}
+
+async function carregarPerfis() {
+  state.perfis = null; render();
+  try { state.perfis = await apiFetch('/api/perfis'); state.rascunho = {}; }
+  catch (e) { state.erro = e.message; }
+  render();
+}
+
+async function salvarPerfis() {
+  state.salvando = true; state.msg = null; render();
+  const fabricas = {}, clientes = {};
+  Object.keys(state.rascunho || {}).forEach((k) => {
+    const [tipo, id] = k.split('|');
+    (tipo === 'fab' ? fabricas : clientes)[id] = state.rascunho[k];
+  });
+  try {
+    const base = getApiBase().replace(/\/$/, '');
+    const r = await fetch(base + '/api/perfis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+      body: JSON.stringify({ fabricas, clientes }),
+    });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b.error || 'falhou');
+    state.msg = `salvo: ${b.fabricas} fábricas, ${b.clientes} clientes`;
+    state.rascunho = {};
+    state.dados = null; // a análise muda com o perfil
+  } catch (e) { state.msg = 'erro: ' + e.message; }
+  state.salvando = false; render();
 }
 
 function renderLista() {
@@ -545,6 +658,8 @@ function render() {
     return;
   }
   if (!state.dados) { app.innerHTML = '<div class="carregando">Carregando a análise…</div>'; return; }
+  if (state.tela === 'perfis') { app.innerHTML = renderPerfis(); ligar(); return; }
+  if (!state.dados) { carregar(); return; }
   app.innerHTML = state.tela === 'cidade' ? renderCidade()
     : state.tela === 'fabrica' ? renderFabrica() : renderLista();
   ligar();
@@ -553,6 +668,25 @@ function render() {
 function ligar() {
   const rec = document.getElementById('btn-recarregar');
   if (rec) rec.addEventListener('click', () => carregar());
+  const bp = document.getElementById('btn-perfis');
+  if (bp) bp.addEventListener('click', () => { state.tela = 'perfis'; window.scrollTo(0,0); carregarPerfis(); });
+  const sp = document.getElementById('btn-salvar-perfis');
+  if (sp) sp.addEventListener('click', () => salvarPerfis());
+  document.querySelectorAll('.pf b').forEach((el) => {
+    el.addEventListener('click', () => {
+      const span = el.parentElement;
+      const tipo = span.getAttribute('data-tipo');
+      const id = decodeURIComponent(span.getAttribute('data-id'));
+      const p = el.getAttribute('data-p');
+      const lista = state.perfis[tipo === 'fab' ? 'fabricas' : 'clientes'];
+      const item = lista.find((x) => (tipo === 'fab' ? x.nome : x.logId) === id);
+      const atual = valorPerfil(tipo, item).slice();
+      const i = atual.indexOf(p);
+      if (i >= 0) atual.splice(i, 1); else atual.push(p);
+      state.rascunho[chaveP(tipo, id)] = atual;
+      render();
+    });
+  });
   const volt = document.getElementById('btn-voltar');
   if (volt) volt.addEventListener('click', () => { state.tela = 'lista'; state.fabrica = null; render(); });
   const voltF = document.getElementById('btn-voltar-fab');
