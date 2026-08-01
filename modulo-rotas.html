@@ -551,7 +551,9 @@ async function loadData(showLoading) {
   state.loading = false;
   render();
   // status do sync na nuvem em segundo plano, sem travar a tela
-  carregarNuvem().catch(() => {});
+  // 01/08/2026: nao consulta mais /api/sessao/status. A rota do servidor
+  // logar no Mercos esta desligada e a faixa que mostrava esse estado saiu
+  // da tela (ver renderNuvem). Chamar aqui so gastava requisicao.
 }
 
 /**
@@ -708,13 +710,30 @@ function renderIdade() {
   </div>`;
 }
 
-/* ===== Sync na nuvem, 3x por dia =====
- * Quem atualiza e o GitHub Actions chamando /api/sync-incremental. Nao depende
- * de PC ligado. O servidor faz o proprio login no Mercos; este painel so mostra
- * o estado e, nas raras vezes em que o Mercos pede o codigo do e-mail, oferece
- * o campo para confirmar uma vez.
+/* ===== Faixa de sync na nuvem — APOSENTADA em 01/08/2026 =====
+ *
+ * Esta faixa nasceu quando a aposta era o SERVIDOR entrar sozinho no Mercos.
+ * Essa rota morreu: login de fora da rede do Bruno dispara codigo por e-mail
+ * (que cai na caixa da Gisele) atras de reCAPTCHA. O login automatico esta
+ * desligado de proposito no servidor.
+ *
+ * Quem atualiza hoje e a extensao do Chrome, e ela funciona. So que a faixa
+ * continuava anunciando "Sync na nuvem pausado" com um botao "Tentar conectar"
+ * que nao levava a lugar nenhum. Bruno, com razao: "nao justifica estar ali".
+ *
+ * Aviso de erro que o usuario nao pode resolver e ruido, e ruido em painel de
+ * campo custa confianca no que esta certo ao lado. A data da ultima
+ * sincronizacao ja aparece no topo e a faixa de idade avisa quando o dado
+ * envelhece — isso basta.
+ *
+ * Mantida como funcao vazia (em vez de apagada) porque o dia em que o Mercos
+ * liberar os tokens oficiais, o lugar de mostrar esse estado e aqui.
  */
 function renderNuvem() {
+  return '';
+}
+
+function renderNuvemAntiga() {
   const n = state.nuvem;
   if (!n) return '';
   if (n.erro) {
