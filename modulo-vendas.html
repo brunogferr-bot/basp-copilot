@@ -96,6 +96,13 @@
   .mapa-det b{font-size:14.5px}
   .mapa-det .cid{color:var(--ink-soft);font-size:11.5px;font-weight:400}
 
+  .legenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 4px;font-size:12px;
+    color:var(--ink-soft)}
+  .legenda .lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .legenda .lg i{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}
+  .legenda .lg i.esc{width:26px;height:13px;border-radius:4px}
+  .pt-marca{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+
   /* ===== PAINEL GRAFICO ===== */
   .mapa{width:100%;height:auto;display:block;margin-top:6px;border-radius:10px}
   .mapa .pt{cursor:pointer}
@@ -174,7 +181,7 @@ async function apiFetch(path) {
 }
 
 const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
-  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null };
+  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia' };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -555,6 +562,34 @@ const COORD = {
   'BRASILIA|DF': [-15.79, -47.88], 'GUARA|DF': [-15.83, -47.98],
 };
 
+/* Uma cor por marca. Escolhidas para se separarem no escuro e para nenhuma
+ * competir com o dourado da interface. A ordem e fixa: a mesma fabrica tem
+ * sempre a mesma cor, senao o mapa mente de uma abertura para outra. */
+const CORES_MARCA = ['#e8b54a','#7cc4e8','#c88ee0','#7fd39b','#ff9f7a','#9fb8ff',
+  '#f0d59a','#5fbdb0','#e88ab0','#b6d36f','#d2af78','#8fa9c9','#e0a86a','#84d2e0','#c9c07a'];
+
+function corDaMarca(nome) {
+  const fabs = (state.dados.fabricas || []).filter((f) => !f.arquivada)
+    .map((f) => f.nome).sort();
+  const i = fabs.indexOf(nome);
+  return i < 0 ? 'var(--flat)' : CORES_MARCA[i % CORES_MARCA.length];
+}
+
+/** Qual marca manda em cada praca, e com que fatia. "Relevancia da marca"
+ *  aqui e participacao no faturamento DAQUELA cidade — nao no total geral.
+ *  Uma marca pode ser pequena na BASP e dona absoluta de uma praca. */
+function marcaDominante(cidade, uf) {
+  let melhor = null, total = 0;
+  (state.dados.fabricas || []).filter((f) => !f.arquivada).forEach((f) => {
+    const c = (f.cidades || []).find((x) => x.cidade === cidade && x.uf === uf);
+    if (!c || !c.total12) return;
+    total += c.total12;
+    if (!melhor || c.total12 > melhor.valor) melhor = { nome: f.nome, valor: c.total12 };
+  });
+  if (!melhor) return null;
+  return { ...melhor, fatia: Math.round((melhor.valor / total) * 100) };
+}
+
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 const coordDe = (cidade, uf) => COORD[`${semAcento(cidade)}|${String(uf || '').toUpperCase()}`] || null;
 
@@ -587,10 +622,19 @@ function renderMapa() {
   // maiores por último, para o ponto grande não cobrir o pequeno
   const ordem = cidades.slice().sort((a, b) => b.total12 - a.total12);
 
+  /* No modo "marca", a cor deixa de ser rumo e passa a ser QUEM manda na
+   * praca. Sao duas perguntas diferentes e o Bruno precisa das duas: uma
+   * mostra para onde a cidade vai, a outra mostra de quem ela e. */
+  const corDoPonto = (c) => {
+    if (state.mapaCor !== 'marca') return corTendencia(c.variacao);
+    const m = marcaDominante(c.cidade, c.uf);
+    return m ? corDaMarca(m.nome) : 'var(--flat)';
+  };
+
   const halos = ordem.map((c) => {
     const [la, lo] = coordDe(c.cidade, c.uf);
     return `<circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${(raio(c.total12) * 1.9).toFixed(1)}"
-      fill="${corTendencia(c.variacao)}" opacity="0.13"/>`;
+      fill="${corDoPonto(c)}" opacity="0.13"/>`;
   }).join('');
 
   const pontos = ordem.slice().reverse().map((c) => {
@@ -599,7 +643,7 @@ function renderMapa() {
     const grande = r > 26;
     return `<g class="pt" data-mapa="${encodeURIComponent(c.cidade + '|' + c.uf)}">
       <circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${r.toFixed(1)}"
-        fill="${corTendencia(c.variacao)}" opacity="0.55" stroke="${corTendencia(c.variacao)}" stroke-width="1.5"/>
+        fill="${corDoPonto(c)}" opacity="0.55" stroke="${corDoPonto(c)}" stroke-width="1.5"/>
       ${grande ? `<text x="${px(lo).toFixed(1)}" y="${(py(la) + 4).toFixed(1)}" text-anchor="middle"
         font-size="15" fill="#f5f0e8" font-family="Jura,sans-serif">${esc(c.cidade.slice(0, 11))}</text>` : ''}
     </g>`;
@@ -607,14 +651,39 @@ function renderMapa() {
 
   return `<div class="sec mapa-sec">
     <h3>Onde a BASP se move</h3>
-    <div class="desc">Tamanho é faturamento dos últimos 12 meses. Cor é para onde está indo:
-      <b class="up">crescendo</b>, <b class="flat">estável</b>, <b class="down">caindo</b>,
-      <b class="new">cidade nova</b>. Toque num ponto.</div>
+    <div class="desc">O tamanho do ponto é sempre o faturamento dos últimos 12 meses.
+      A cor muda conforme a pergunta:</div>
+    <div class="chips">
+      <span class="chip ${state.mapaCor === 'tendencia' ? 'on' : ''}" data-mcor="tendencia">Para onde vai</span>
+      <span class="chip ${state.mapaCor === 'marca' ? 'on' : ''}" data-mcor="marca">De quem é a praça</span>
+    </div>
+    ${renderLegenda()}
     <svg viewBox="0 0 ${W} ${H}" class="mapa" role="img" aria-label="Mapa de calor da carteira">
       ${halos}${pontos}
     </svg>
     ${renderMapaDetalhe()}
     ${fora.length ? `<div class="nota">Sem posição no mapa: ${fora.map((c) => esc(c.cidade)).join(', ')}.</div>` : ''}
+  </div>`;
+}
+
+/** Legenda de verdade, com as cores na tela. Antes era uma frase corrida —
+ *  e frase não se lê no volante, entre uma loja e outra. */
+function renderLegenda() {
+  if (state.mapaCor === 'marca') {
+    const fabs = (state.dados.fabricas || []).filter((f) => !f.arquivada && f.total12 > 0)
+      .slice().sort((a, b) => b.total12 - a.total12);
+    return `<div class="legenda">
+      ${fabs.map((f) => `<span class="lg"><i style="background:${corDaMarca(f.nome)}"></i>${esc(f.nome)}</span>`).join('')}
+      <span class="lg"><i style="background:var(--flat)"></i>sem venda nos 12 meses</span>
+    </div>
+    <div class="nota">A cor é a marca que mais fatura naquela cidade. Toque no ponto
+      para ver a fatia dela na praça.</div>`;
+  }
+  return `<div class="legenda">
+    <span class="lg"><i style="background:var(--up)"></i>crescendo acima de 15%</span>
+    <span class="lg"><i style="background:var(--flat)"></i>estável</span>
+    <span class="lg"><i style="background:var(--down)"></i>caindo acima de 15%</span>
+    <span class="lg"><i style="background:var(--new)"></i>praça nova, sem base de comparação</span>
   </div>`;
 }
 
@@ -632,6 +701,9 @@ function renderMapaDetalhe() {
     <span style="color:${cor}">${c.variacao == null ? 'praça nova' :
       (c.variacao > 0 ? '+' : '') + c.variacao + '% vs 12 anteriores'}</span>
     <span>${c.clientes12} loja(s) comprando · ${c.fabricas} fábrica(s) ativas</span>
+    ${(() => { const m = marcaDominante(c.cidade, c.uf); return m
+      ? `<span><i class="pt-marca" style="background:${corDaMarca(m.nome)}"></i>
+          <b>${esc(m.nome)}</b> puxa ${m.fatia}% da praça</span>` : ''; })()}
   </div>`;
 }
 
@@ -720,8 +792,15 @@ function renderMatriz() {
 
   return `<div class="sec">
     <h3>Fábrica por cidade</h3>
-    <div class="desc">Quanto mais dourado, mais forte. Ponto cinza é praça onde essa
-      fábrica ainda não entrou — é campo livre, não erro de dado.</div>
+    <div class="desc">A intensidade é a relevância da marca naquela praça.
+      Ponto cinza é cidade onde a fábrica ainda não entrou — campo livre, não erro de dado.</div>
+    <div class="legenda">
+      <span class="lg"><i class="esc" style="background:rgba(210,175,120,.12)"></i>pouco</span>
+      <span class="lg"><i class="esc" style="background:rgba(210,175,120,.38)"></i></span>
+      <span class="lg"><i class="esc" style="background:rgba(210,175,120,.64)"></i></span>
+      <span class="lg"><i class="esc" style="background:rgba(210,175,120,.87)"></i>forte</span>
+      <span class="lg"><i class="esc" style="background:transparent;border:1px solid var(--border)"></i>não entrou</span>
+    </div>
     <div class="mx-wrap"><table class="mx">
       <tr><th></th>${cab}</tr>
       ${linhas}
@@ -962,6 +1041,12 @@ function ligar() {
     el.addEventListener('click', () => {
       state.fabrica = decodeURIComponent(el.getAttribute('data-fab'));
       state.tela = 'fabrica'; window.scrollTo(0, 0); render();
+    });
+  });
+  document.querySelectorAll('[data-mcor]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.mapaCor = el.getAttribute('data-mcor');
+      render();
     });
   });
   document.querySelectorAll('[data-mapa]').forEach((el) => {
