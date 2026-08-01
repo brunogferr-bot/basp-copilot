@@ -566,20 +566,77 @@ async function loadData(showLoading) {
  * A sincronização de verdade roda pelo navegador já logado (tarefa agendada),
  * e este botão traz o resultado mais recente dela.
  */
+/* ID da extensao BASP Sync, carregada sem compactacao neste Chrome. Enquanto
+ * a pasta nao mudar de lugar, o ID e estavel. Se um dia mudar, o painel
+ * simplesmente nao acha a extensao e volta ao comportamento antigo — nao
+ * quebra nada. */
+const EXT_SYNC_ID = 'haabegaocekajdlaadnapefamakkakgj';
+
+/**
+ * Pede a extensao para varrer o Mercos agora.
+ * Devolve null quando nao ha extensao (outro navegador, celular, extensao
+ * desligada) — nesse caso o botao cai no comportamento antigo.
+ */
+function pedirVarreduraNaExtensao() {
+  return new Promise((resolve) => {
+    const c = window.chrome;
+    if (!c || !c.runtime || typeof c.runtime.sendMessage !== 'function') return resolve(null);
+    let respondeu = false;
+    const desistir = setTimeout(() => { if (!respondeu) resolve(null); }, 90000);
+    try {
+      c.runtime.sendMessage(EXT_SYNC_ID, { acao: 'sincronizarAgora' }, (r) => {
+        respondeu = true;
+        clearTimeout(desistir);
+        // lastError = extensao ausente. Nao e erro para o Bruno, e ausencia.
+        resolve(c.runtime.lastError ? null : (r || null));
+      });
+    } catch (e) {
+      clearTimeout(desistir);
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Botao "Atualizar".
+ *
+ * 01/08/2026: antes ele so relia o dataset do servidor. Bruno perguntou
+ * direto — "busca pedidos realizados a 10 minutos atras?" — e a resposta
+ * honesta era nao. Agora ele manda a extensao varrer o Mercos na hora e so
+ * depois recarrega. Sem extensao, avisa que o dado e da ultima rodada
+ * automatica, em vez de dar a entender que foi conferir.
+ */
 async function doSync() {
   state.syncing = true;
   state.syncMsg = null;
   render();
   try {
+    const varreu = await pedirVarreduraNaExtensao();
     const antes = state.data && state.data.meta ? state.data.meta.lastSync : null;
     await loadData(false);
     const depois = state.data && state.data.meta ? state.data.meta.lastSync : null;
-    state.syncMsg = {
-      type: 'ok',
-      text: (antes && depois && antes !== depois)
-        ? 'Dados atualizados.'
-        : 'Você já está com os dados mais recentes (sincronizados em ' + fmtDateTime(depois) + ').',
-    };
+    const mudou = antes && depois && antes !== depois;
+
+    if (varreu && varreu.ok) {
+      state.syncMsg = {
+        type: 'ok',
+        text: `Busquei no Mercos agora: ${varreu.clientes} clientes conferidos.`,
+      };
+    } else if (varreu && !varreu.ok) {
+      state.syncMsg = {
+        type: 'error',
+        text: varreu.sessao
+          ? 'A sessão do Mercos caiu. Abra o Mercos no Chrome e entre com o seu login.'
+          : 'Não consegui buscar no Mercos agora. Mostrando a última sincronização.',
+      };
+    } else {
+      state.syncMsg = {
+        type: 'ok',
+        text: mudou
+          ? 'Dados atualizados.'
+          : 'Este é o resultado da última sincronização automática (' + fmtDateTime(depois) + ').',
+      };
+    }
   } catch (e) {
     state.syncMsg = { type: 'error', text: 'Não consegui buscar os dados: ' + e.message };
   }
