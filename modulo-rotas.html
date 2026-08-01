@@ -566,6 +566,72 @@ async function loadData(showLoading) {
  * A sincronização de verdade roda pelo navegador já logado (tarefa agendada),
  * e este botão traz o resultado mais recente dela.
  */
+/* =====================================================================
+ * O PAINEL SE VIRA SOZINHO — 01/08/2026
+ *
+ * Bruno: "quando eu esteja no celular, essas funcoes de extensao, ctrl shift
+ * r, eu nao conseguirei fazer... estar no transito, estar numa estrada, ou no
+ * sinal fechado, e ter que fazer essas diversas funcoes nunca ira funcionar".
+ *
+ * Ele tem razao e a conclusao e simples: no celular o painel nao pode exigir
+ * NADA. Nem recarregar, nem forcar cache, nem apertar Atualizar.
+ *
+ * Tres automatismos resolvem:
+ *
+ * 1. RECARREGA AO OLHAR. Celular no bolso congela a aba. Quando ele volta
+ *    para a tela, o navegador dispara visibilitychange — e a gente busca o
+ *    dado na hora. Ou seja: o ato de olhar ja atualiza.
+ * 2. ENQUANTO ESTA ABERTO, a cada 60 segundos busca de novo em silencio. So
+ *    redesenha se o lastSync mudou, para nao piscar a tela na mao dele.
+ * 3. VERSAO NOVA ENTRA SOZINHA. O Ctrl+Shift+R existia porque o Cloudflare
+ *    serve a versao antiga. Agora o painel pergunta ao servidor qual e a
+ *    versao vigente; se mudou, recarrega quando a tela estiver fora de foco
+ *    (para nao atrapalhar no meio de um registro de visita).
+ *
+ * O dado em si vem do PC do escritorio, onde a extensao varre o Mercos de 10
+ * em 10 minutos. O celular so le.
+ * ===================================================================== */
+
+/** Trocado a cada publicacao; o versao.json no servidor traz o mesmo valor. */
+const BUILD = '2026-08-01T13:40';
+
+let ultimoOlhar = 0;
+
+async function atualizarSilencioso() {
+  if (document.visibilityState !== 'visible') return;
+  if (Date.now() - ultimoOlhar < 15000) return; // nao repetir em rajada
+  ultimoOlhar = Date.now();
+  try {
+    const antes = state.data && state.data.meta ? state.data.meta.lastSync : null;
+    await loadData(false);
+    const depois = state.data && state.data.meta ? state.data.meta.lastSync : null;
+    if (antes !== depois) render(); // so redesenha se mudou de verdade
+  } catch (e) { /* sem rede: fica com o que tem, sem alarde */ }
+}
+
+async function conferirVersao() {
+  try {
+    const r = await fetch('versao.json?t=' + Date.now(), { cache: 'no-store' });
+    const v = await r.json();
+    if (!v || !v.build || v.build === BUILD) return;
+    // Versao nova. Recarrega quando ele nao estiver olhando, para nunca
+    // engolir um registro de visita pela metade.
+    if (document.visibilityState === 'hidden') location.reload();
+    else state.versaoNova = true;
+  } catch (e) { /* versao.json ausente: segue a vida */ }
+}
+
+function ligarAutomacao() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') atualizarSilencioso();
+    else conferirVersao();
+  });
+  window.addEventListener('focus', atualizarSilencioso);
+  setInterval(atualizarSilencioso, 60000);
+  setInterval(conferirVersao, 5 * 60000);
+  conferirVersao();
+}
+
 /* ID da extensao BASP Sync, carregada sem compactacao neste Chrome. Enquanto
  * a pasta nao mudar de lugar, o ID e estavel. Se um dia mudar, o painel
  * simplesmente nao acha a extensao e volta ao comportamento antigo — nao
@@ -889,6 +955,7 @@ function renderTopbar() {
   <div class="last-sync-note">Última sincronização com o Mercos: ${meta ? fmtDateTime(meta.lastSync) : '--'}</div>
   ${renderIdade()}
   ${renderNuvem()}
+  ${state.versaoNova ? `<div class="sync-summary" id="barra-versao" style="cursor:pointer">Versão nova do painel disponível. Toque para atualizar.</div>` : ''}
   ${state.syncMsg ? `<div class="${state.syncMsg.type === 'ok' ? 'sync-summary' : 'sync-error'}">${state.syncMsg.text}</div>` : ''}`;
 }
 
@@ -1905,6 +1972,11 @@ function bindEvents() {
       } catch (e) { alert('Erro: ' + e.message); render(); }
     });
   });
+
+  // Barra de versao nova: precisa ser religada a cada render, porque o
+  // render() refaz o DOM inteiro.
+  const bv = document.getElementById('barra-versao');
+  if (bv) bv.addEventListener('click', () => location.reload());
 }
 
 function preserveFocus(id) {
@@ -1914,6 +1986,7 @@ function preserveFocus(id) {
 
 // ---------- INIT ----------
 if (getApiToken()) { loadData(); } else { render(); }
+ligarAutomacao();
 </script>
 </body>
 </html>
