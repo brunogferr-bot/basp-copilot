@@ -181,7 +181,7 @@ async function apiFetch(path) {
 }
 
 const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
-  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia' };
+  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia', malhas: null };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -590,6 +590,68 @@ function marcaDominante(cidade, uf) {
   return { ...melhor, fatia: Math.round((melhor.valor / total) * 100) };
 }
 
+/* =====================================================================
+ * MALHA GEOGRAFICA DOS ESTADOS — IBGE
+ *
+ * Bruno pediu o desenho de verdade: "quero o desenho dos estados, e as
+ * cidades que atendemos". Ponto solto no vazio nao e mapa — sem o contorno
+ * ele nao sabe se a praca esta no meio do estado ou na divisa.
+ *
+ * A malha vem da API publica do IBGE (servicodados.ibge.gov.br), em
+ * qualidade minima, e fica guardada no proprio aparelho. Ou seja: baixa uma
+ * vez e nunca mais. Nao embuti as coordenadas no arquivo de proposito — sao
+ * 12 KB que so servem para desenhar, e o painel ja carrega no 4G, na rua.
+ *
+ * Se o IBGE estiver fora do ar, o mapa continua funcionando sem o contorno.
+ * Degrada, nao quebra.
+ * ===================================================================== */
+const IBGE_UF = { MG: 31, GO: 52, DF: 53, SP: 35, MS: 50, BA: 29, TO: 17, MT: 51 };
+const LS_MALHAS = 'basp_malhas_ibge_v1';
+
+/** Estados onde a BASP realmente opera — sao os que ganham preenchimento.
+ *  Os outros entram so como contorno, para dar referencia geografica. */
+const UF_NUCLEO = ['MG', 'GO', 'DF'];
+
+async function carregarMalhas() {
+  try {
+    const salvo = localStorage.getItem(LS_MALHAS);
+    if (salvo) { state.malhas = JSON.parse(salvo); return; }
+  } catch (e) { /* localStorage cheio ou bloqueado: segue sem cache */ }
+
+  const out = {};
+  for (const [uf, cod] of Object.entries(IBGE_UF)) {
+    try {
+      const r = await fetch(
+        `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${cod}?formato=application/vnd.geo+json&qualidade=minima`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!r.ok) continue;
+      const g = await r.json();
+      const aneis = [];
+      (g.features || []).forEach((f) => {
+        const c = f.geometry.coordinates;
+        const polys = f.geometry.type === 'Polygon' ? [c] : c;
+        polys.forEach((p) => p.forEach((anel) => {
+          // simplifica: no celular, detalhe menor que ~15 km nao aparece
+          const tol = uf === 'DF' ? 0.02 : 0.12;
+          const s = []; let u = null;
+          anel.forEach((pt) => {
+            if (!u || Math.abs(pt[0] - u[0]) > tol || Math.abs(pt[1] - u[1]) > tol) {
+              s.push([+pt[0].toFixed(2), +pt[1].toFixed(2)]); u = pt;
+            }
+          });
+          if (s.length > 5) aneis.push(s);
+        }));
+      });
+      if (aneis.length) out[uf] = aneis;
+    } catch (e) { /* um estado que falha nao derruba os outros */ }
+  }
+  if (Object.keys(out).length) {
+    state.malhas = out;
+    try { localStorage.setItem(LS_MALHAS, JSON.stringify(out)); } catch (e) { /* sem cache */ }
+  }
+}
+
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 const coordDe = (cidade, uf) => COORD[`${semAcento(cidade)}|${String(uf || '').toUpperCase()}`] || null;
 
@@ -610,8 +672,17 @@ function renderMapa() {
 
   const lats = cidades.map((c) => coordDe(c.cidade, c.uf)[0]);
   const lons = cidades.map((c) => coordDe(c.cidade, c.uf)[1]);
-  const lat0 = Math.min(...lats) - 0.7, lat1 = Math.max(...lats) + 0.7;
-  const lon0 = Math.min(...lons) - 0.7, lon1 = Math.max(...lons) + 0.7;
+
+  /* O enquadramento segue os estados onde a BASP opera, nao as cidades.
+   * Enquadrar so nas cidades cortava MG pela metade e o mapa deixava de
+   * parecer mapa. */
+  const M = state.malhas || {};
+  UF_NUCLEO.forEach((uf) => (M[uf] || []).forEach((anel) => anel.forEach((p) => {
+    lons.push(p[0]); lats.push(p[1]);
+  })));
+
+  const lat0 = Math.min(...lats) - 0.4, lat1 = Math.max(...lats) + 0.4;
+  const lon0 = Math.min(...lons) - 0.4, lon1 = Math.max(...lons) + 0.4;
   const W = 1000, H = Math.round(W * ((lat1 - lat0) / (lon1 - lon0)) * 0.92);
   const px = (lon) => ((lon - lon0) / (lon1 - lon0)) * W;
   const py = (lat) => ((lat1 - lat) / (lat1 - lat0)) * H;
@@ -631,21 +702,64 @@ function renderMapa() {
     return m ? corDaMarca(m.nome) : 'var(--flat)';
   };
 
+  /* Contorno dos estados. Os de fora do nucleo entram apenas como referencia
+   * geografica, sem preenchimento — se pintasse todos, o olho procuraria
+   * significado onde nao ha. */
+  const caminho = (anel) => anel.map((p, i) =>
+    `${i ? 'L' : 'M'}${px(p[0]).toFixed(1)},${py(p[1]).toFixed(1)}`).join('') + 'Z';
+
+  const estadoPorUf = {};
+  (d.estados || []).forEach((e) => { estadoPorUf[e.uf] = e; });
+
+  const formas = Object.entries(M).map(([uf, aneis]) => {
+    const nucleo = UF_NUCLEO.includes(uf);
+    const e = estadoPorUf[uf];
+    const cor = nucleo && e ? corTendencia(e.variacao) : 'transparent';
+    return `<g class="uf-forma">${aneis.map((anel) => `<path d="${caminho(anel)}"
+      fill="${cor}" fill-opacity="${nucleo ? 0.10 : 0}"
+      stroke="${nucleo ? 'rgba(210,175,120,0.55)' : 'rgba(210,175,120,0.16)'}"
+      stroke-width="${nucleo ? 2 : 1}" stroke-linejoin="round"/>`).join('')}</g>`;
+  }).join('');
+
   const halos = ordem.map((c) => {
     const [la, lo] = coordDe(c.cidade, c.uf);
     return `<circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${(raio(c.total12) * 1.9).toFixed(1)}"
       fill="${corDoPonto(c)}" opacity="0.13"/>`;
   }).join('');
 
+  /* TODA cidade recebe nome — foi o que o Bruno pediu. Mas nome sobreposto
+   * e pior que nome nenhum, entao as maiores escrevem primeiro e as menores
+   * cedem o lugar quando o retangulo do texto colide. Quem cede continua no
+   * mapa como ponto, e o nome aparece ao tocar. */
+  const ocupados = [];
+  const cabe = (x, y, larg) => {
+    const cx0 = x - larg / 2, cx1 = x + larg / 2, cy0 = y - 11, cy1 = y + 5;
+    const bate = ocupados.some((o) => !(cx1 < o[0] || cx0 > o[2] || cy1 < o[1] || cy0 > o[3]));
+    if (!bate) ocupados.push([cx0, cy0, cx1, cy1]);
+    return !bate;
+  };
+
+  const rotulos = ordem.map((c) => {
+    const [la, lo] = coordDe(c.cidade, c.uf);
+    const r = raio(c.total12);
+    const nome = c.cidade.length > 15 ? c.cidade.slice(0, 14) + '.' : c.cidade;
+    const dentro = r > 30;
+    const fs = dentro ? 15 : 13;
+    const larg = nome.length * fs * 0.55;
+    const x = px(lo), y = dentro ? py(la) + 5 : py(la) - r - 6;
+    if (!cabe(x, y, larg)) return '';
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${fs}"
+      fill="${dentro ? '#1a1512' : '#f5f0e8'}" font-weight="${dentro ? 700 : 400}"
+      font-family="Jura,sans-serif" paint-order="stroke"
+      stroke="${dentro ? 'none' : 'rgba(13,11,9,0.75)'}" stroke-width="3">${esc(nome)}</text>`;
+  }).join('');
+
   const pontos = ordem.slice().reverse().map((c) => {
     const [la, lo] = coordDe(c.cidade, c.uf);
     const r = raio(c.total12);
-    const grande = r > 26;
     return `<g class="pt" data-mapa="${encodeURIComponent(c.cidade + '|' + c.uf)}">
       <circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${r.toFixed(1)}"
         fill="${corDoPonto(c)}" opacity="0.55" stroke="${corDoPonto(c)}" stroke-width="1.5"/>
-      ${grande ? `<text x="${px(lo).toFixed(1)}" y="${(py(la) + 4).toFixed(1)}" text-anchor="middle"
-        font-size="15" fill="#f5f0e8" font-family="Jura,sans-serif">${esc(c.cidade.slice(0, 11))}</text>` : ''}
     </g>`;
   }).join('');
 
@@ -659,7 +773,9 @@ function renderMapa() {
     </div>
     ${renderLegenda()}
     <svg viewBox="0 0 ${W} ${H}" class="mapa" role="img" aria-label="Mapa de calor da carteira">
-      ${halos}${pontos}
+      ${formas}${halos}${pontos}${rotulos}
+      ${Object.keys(M).length ? '' : `<text x="${(W/2).toFixed(0)}" y="18" text-anchor="middle"
+        font-size="14" fill="rgba(245,240,232,0.45)" font-family="Jura,sans-serif">carregando o contorno dos estados…</text>`}
     </svg>
     ${renderMapaDetalhe()}
     ${fora.length ? `<div class="nota">Sem posição no mapa: ${fora.map((c) => esc(c.cidade)).join(', ')}.</div>` : ''}
@@ -1065,6 +1181,10 @@ function ligar() {
 }
 
 async function carregar() {
+  // A malha nao bloqueia a tela: o mapa aparece com os pontos e o contorno
+  // entra assim que chegar.
+  carregarMalhas().then(() => { if (state.dados) render(); }).catch(() => {});
+
   state.erro = null; state.dados = null; render();
   try {
     state.dados = await apiFetch('/api/fabricas/analise');
