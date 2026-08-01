@@ -216,6 +216,112 @@ tr.clicavel:hover td { background: rgba(210, 175, 120, 0.07); }
 }
 .basp-voltar:hover { border-color: var(--gbs); color: var(--gold-light); }
 
+/* =====================================================================
+ * CORREÇÃO DE CONTRASTE — 01/08/2026
+ *
+ * O remapeamento de variáveis não alcança fundo escrito na unha. Vários
+ * blocos do Rotas usam cores fixas de papel (#fbf7ee, #eef3ee, #fdf3e7...).
+ * Com o texto virando marfim, o resultado foi claro sobre claro: os números
+ * de faturamento sumiram da tela. Bruno: "contraste horrível".
+ *
+ * Regra daqui pra frente: fundo fixo claro em componente é dívida. Ou vira
+ * véu translúcido sobre o escuro, ou não entra.
+ * ===================================================================== */
+
+/* --- caixas de número, apelido, fábricas, grupo --- */
+.num-box,
+.apelido-box,
+.fab-wrap,
+.group-panel,
+.nuvem,
+.gear-btn {
+  background: rgba(245, 240, 232, 0.05) !important;
+  border: 0.5px solid var(--gb) !important;
+  color: var(--ivory) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.num-box .rot,
+.num-box small,
+.nuvem-msg,
+.fab-linha-sub,
+.last-sync-note,
+.group-panel h4 { color: var(--text-muted) !important; }
+.num-box b, .num-box strong { color: var(--ivory) !important; }
+.num-box.clicavel:hover { border-color: var(--gold) !important; background: rgba(210, 175, 120, 0.10) !important; }
+
+/* --- faixas informativas --- */
+.ranking-line,
+.sync-summary {
+  background: rgba(127, 211, 155, 0.10) !important;
+  border: 0.5px solid rgba(127, 211, 155, 0.28) !important;
+  color: #b9e6c8 !important;
+}
+.ranking-line small { color: rgba(185, 230, 200, 0.72) !important; }
+.ranking-line b { color: #d6f2df !important; }
+
+.showroom-line {
+  background: rgba(210, 175, 120, 0.10) !important;
+  border: 0.5px solid var(--gb) !important;
+  color: var(--gold-light) !important;
+}
+
+.pendencia-box,
+.sync-error {
+  background: rgba(255, 122, 107, 0.10) !important;
+  border: 0.5px solid rgba(255, 122, 107, 0.32) !important;
+  color: #ffb3a8 !important;
+}
+
+/* --- aviso de dado velho --- */
+.idade {
+  background: rgba(232, 181, 74, 0.10) !important;
+  border: 0.5px solid rgba(232, 181, 74, 0.30) !important;
+  border-left: 3px solid var(--atencao) !important;
+  color: #f0d59a !important;
+}
+.idade.grave {
+  background: rgba(255, 122, 107, 0.10) !important;
+  border-color: rgba(255, 122, 107, 0.32) !important;
+  border-left-color: var(--urgente) !important;
+  color: #ffb3a8 !important;
+}
+
+/* --- selos e etiquetas --- */
+.badge-count { background: rgba(245, 240, 232, 0.08) !important; color: var(--text-muted) !important; border: 0.5px solid var(--gb) !important; }
+.badge-group { background: rgba(210, 175, 120, 0.12) !important; color: var(--gold-light) !important; border: 0.5px solid var(--gb) !important; }
+
+/* --- botões de campo: ligar, WhatsApp, rota --- */
+.field-btn { background: rgba(245, 240, 232, 0.05) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.field-btn.call { border: 0.5px solid rgba(127, 211, 155, 0.35) !important; color: #9fe0b6 !important; }
+.field-btn.zap  { border: 0.5px solid rgba(127, 211, 155, 0.45) !important; color: #8fe3ae !important; }
+.field-btn.map  { border: 0.5px solid rgba(124, 196, 232, 0.40) !important; color: #9fd4ef !important; }
+.field-btn[disabled], .field-btn.sem { color: var(--text-muted) !important; opacity: .55; }
+
+/* --- fábricas por cliente --- */
+.fab-ticket.comprada    { background: rgba(127, 211, 155, 0.14) !important; border: 0.5px solid rgba(127, 211, 155, 0.35) !important; color: #9fe0b6 !important; }
+.fab-ticket.elegivel    { background: rgba(232, 181, 74, 0.14) !important;  border: 0.5px solid rgba(232, 181, 74, 0.35) !important;  color: #f0d59a !important; }
+.fab-ticket.oportunidade{ background: rgba(255, 122, 107, 0.14) !important; border: 0.5px solid rgba(255, 122, 107, 0.35) !important; color: #ffb3a8 !important; }
+.fab-barra { background: rgba(245, 240, 232, 0.10) !important; }
+.fab-arq:hover { background: rgba(255, 122, 107, 0.14) !important; color: var(--urgente) !important; }
+
+/* --- botões gerais que tinham fundo branco --- */
+.btn { background: rgba(245, 240, 232, 0.05) !important; color: var(--gold-light) !important; border: 0.5px solid var(--gb) !important; }
+.btn:hover { background: rgba(210, 175, 120, 0.14) !important; border-color: var(--gbs) !important; }
+.btn-primary { background: rgba(210, 175, 120, 0.18) !important; border-color: var(--gold) !important; color: var(--gold-light) !important; }
+.btn-primary:hover { background: rgba(210, 175, 120, 0.28) !important; }
+
+/* --- estados vazios e textos de apoio --- */
+.empty-state, .metrics-row { color: var(--text-muted) !important; }
+.metrics-row b { color: var(--ivory) !important; }
+.history-entry { border-bottom: 1px solid var(--gb) !important; }
+
+/* --- rede de segurança: qualquer resto de fundo de papel --- */
+[style*="background:#fff"], [style*="background: #fff"] {
+  background: rgba(245, 240, 232, 0.05) !important;
+  color: var(--ivory) !important;
+}
+
 /* ---------- celular ---------- */
 
 @media (max-width: 720px) {
