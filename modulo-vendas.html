@@ -90,6 +90,37 @@
   .erro{background:#fdeceb;border:1px solid #e8b4ac;color:#8c2a1a;
     padding:12px 14px;border-radius:9px;font-size:13.5px}
 
+  .mapa-det{margin-top:10px;padding:10px 12px;border-radius:9px;
+    background:rgba(210,175,120,.10);border:1px solid var(--border);
+    display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;align-items:baseline}
+  .mapa-det b{font-size:14.5px}
+  .mapa-det .cid{color:var(--ink-soft);font-size:11.5px;font-weight:400}
+
+  /* ===== PAINEL GRAFICO ===== */
+  .mapa{width:100%;height:auto;display:block;margin-top:6px;border-radius:10px}
+  .mapa .pt{cursor:pointer}
+  .mapa .pt:hover circle{opacity:.85}
+  .serie{width:100%;height:auto;display:block;margin-top:6px}
+  .uf-linha{display:grid;grid-template-columns:38px 1fr auto auto;gap:9px;align-items:center;
+    padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .uf-linha:last-child{border-bottom:0}
+  .uf-nome{font-weight:700;letter-spacing:.04em}
+  .uf-barra{height:8px;background:rgba(245,240,232,.08);border-radius:99px;overflow:hidden}
+  .uf-barra i{display:block;height:100%;border-radius:99px}
+  .uf-val{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .uf-var{font-weight:700;white-space:nowrap;min-width:56px;text-align:right}
+  .mx-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.mx{border-collapse:separate;border-spacing:3px;font-size:11.5px}
+  .mx th{font-weight:600;color:var(--ink-soft);text-transform:none;letter-spacing:0}
+  .mx-fab{text-align:left;white-space:nowrap;padding-right:8px;max-width:132px;overflow:hidden;
+    text-overflow:ellipsis;border-bottom:0}
+  .mx-cid{height:74px;vertical-align:bottom;border-bottom:0}
+  .mx-cid span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
+  .mx-cel{width:30px;height:26px;border-radius:5px;text-align:center;color:var(--text-muted);
+    border-bottom:0;padding:0}
+  .desc b.up{color:var(--up)} .desc b.down{color:var(--down)}
+  .desc b.flat{color:var(--flat)} .desc b.new{color:var(--new)}
+
   @media (max-width:720px){
     #app{padding:14px 12px 80px}
     .brand{font-size:17px}
@@ -143,7 +174,7 @@ async function apiFetch(path) {
 }
 
 const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
-  perfis: null, rascunho: null, salvando: false, msg: null };
+  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -478,6 +509,230 @@ async function salvarPerfis() {
   state.salvando = false; render();
 }
 
+/* =====================================================================
+ * PAINEL GRÁFICO — abertura da Análise de Vendas
+ *
+ * Bruno pediu "mapa de calor de cada estado, com a movimentação setorial",
+ * comparando com o mapa de calor de jogador no futebol: onde ele anda muito
+ * e onde o campo fica vazio.
+ *
+ * A referência que ele mandou é um bento de vidro fosco. Peguei a estrutura
+ * (cards de tamanhos diferentes, medidor circular, área preenchida, mapa com
+ * pontos acesos) e joguei fora o enfeite: cada card aqui responde a uma
+ * pergunta que muda a decisão da semana. Ele vai ler isso no celular, dentro
+ * do carro — número pequeno e gráfico decorativo não sobrevivem a isso.
+ *
+ * A COR SIGNIFICA TENDÊNCIA, NÃO TAMANHO. Cidade grande e parada tem que
+ * doer na tela; cidade pequena crescendo tem que acender. Se a cor fosse
+ * volume, o mapa só repetiria o que ele já sabe — que Uberlândia é grande.
+ * ===================================================================== */
+
+/* Coordenadas das cidades da carteira. Sem serviço externo de mapa: são 45
+ * pontos fixos, cabem no arquivo e funcionam sem rede. Cidade que não estiver
+ * aqui aparece na lista lateral, nunca sumindo em silêncio. */
+const COORD = {
+  'UBERLANDIA|MG': [-18.92, -48.28], 'UBERABA|MG': [-19.75, -47.93],
+  'ITUIUTABA|MG': [-18.97, -49.46], 'ARAGUARI|MG': [-18.65, -48.19],
+  'PATOS DE MINAS|MG': [-18.58, -46.52], 'PATROCINIO|MG': [-18.94, -46.99],
+  'ARAXA|MG': [-19.59, -46.94], 'SAO GOTARDO|MG': [-19.31, -46.05],
+  'COROMANDEL|MG': [-18.47, -47.20], 'MONTE CARMELO|MG': [-18.72, -47.50],
+  'FRUTAL|MG': [-20.02, -48.94], 'NOVA PONTE|MG': [-19.14, -47.68],
+  'MONTES CLAROS|MG': [-16.73, -43.86], 'JANAUBA|MG': [-15.80, -43.31],
+  'SALINAS|MG': [-16.17, -42.29], 'PIRAPORA|MG': [-17.35, -44.94],
+  'CURVELO|MG': [-18.75, -44.43], 'TAIOBEIRAS|MG': [-15.81, -42.23],
+  'ARACUAI|MG': [-16.85, -42.07], 'PARACATU|MG': [-17.22, -46.87],
+  'JOAO PINHEIRO|MG': [-17.74, -46.17], 'UNAI|MG': [-16.36, -46.91],
+  'BELO HORIZONTE|MG': [-19.92, -43.94], 'NOVA LIMA|MG': [-19.99, -43.85],
+  'JUIZ DE FORA|MG': [-21.76, -43.35], 'TRES CORACOES|MG': [-21.70, -45.25],
+  'CARMO DO CAJURU|MG': [-20.18, -44.79], 'TIRADENTES|MG': [-21.11, -44.18],
+  'GOIANIA|GO': [-16.68, -49.25], 'ANAPOLIS|GO': [-16.33, -48.95],
+  'APARECIDA DE GOIANIA|GO': [-16.82, -49.24], 'RIO VERDE|GO': [-17.79, -50.92],
+  'JATAI|GO': [-17.88, -51.71], 'MINEIROS|GO': [-17.57, -52.55],
+  'QUIRINOPOLIS|GO': [-18.45, -50.45], 'ITUMBIARA|GO': [-18.42, -49.21],
+  'CALDAS NOVAS|GO': [-17.74, -48.62], 'CATALAO|GO': [-18.17, -47.94],
+  'SILVANIA|GO': [-16.66, -48.61], 'ORIZONA|GO': [-17.03, -48.29],
+  'COCALZINHO DE GOIAS|GO': [-15.79, -48.78], 'JUSSARA|GO': [-15.86, -50.87],
+  'BRASILIA|DF': [-15.79, -47.88], 'GUARA|DF': [-15.83, -47.98],
+};
+
+const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+const coordDe = (cidade, uf) => COORD[`${semAcento(cidade)}|${String(uf || '').toUpperCase()}`] || null;
+
+/** Cor pela variação. Cinza quando não há base de comparação — inventar
+ *  percentual sobre zero seria mentira colorida. */
+function corTendencia(v) {
+  if (v == null) return 'var(--new)';
+  if (v >= 15) return 'var(--up)';
+  if (v <= -15) return 'var(--down)';
+  return 'var(--flat)';
+}
+
+function renderMapa() {
+  const d = state.dados;
+  const cidades = (d.cidades || []).filter((c) => coordDe(c.cidade, c.uf));
+  const fora = (d.cidades || []).filter((c) => !coordDe(c.cidade, c.uf) && c.total12 > 0);
+  if (!cidades.length) return '';
+
+  const lats = cidades.map((c) => coordDe(c.cidade, c.uf)[0]);
+  const lons = cidades.map((c) => coordDe(c.cidade, c.uf)[1]);
+  const lat0 = Math.min(...lats) - 0.7, lat1 = Math.max(...lats) + 0.7;
+  const lon0 = Math.min(...lons) - 0.7, lon1 = Math.max(...lons) + 0.7;
+  const W = 1000, H = Math.round(W * ((lat1 - lat0) / (lon1 - lon0)) * 0.92);
+  const px = (lon) => ((lon - lon0) / (lon1 - lon0)) * W;
+  const py = (lat) => ((lat1 - lat) / (lat1 - lat0)) * H;
+
+  const maior = Math.max(...cidades.map((c) => c.total12), 1);
+  const raio = (v) => 8 + Math.sqrt(Math.max(v, 0) / maior) * 46;
+
+  // maiores por último, para o ponto grande não cobrir o pequeno
+  const ordem = cidades.slice().sort((a, b) => b.total12 - a.total12);
+
+  const halos = ordem.map((c) => {
+    const [la, lo] = coordDe(c.cidade, c.uf);
+    return `<circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${(raio(c.total12) * 1.9).toFixed(1)}"
+      fill="${corTendencia(c.variacao)}" opacity="0.13"/>`;
+  }).join('');
+
+  const pontos = ordem.slice().reverse().map((c) => {
+    const [la, lo] = coordDe(c.cidade, c.uf);
+    const r = raio(c.total12);
+    const grande = r > 26;
+    return `<g class="pt" data-mapa="${encodeURIComponent(c.cidade + '|' + c.uf)}">
+      <circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${r.toFixed(1)}"
+        fill="${corTendencia(c.variacao)}" opacity="0.55" stroke="${corTendencia(c.variacao)}" stroke-width="1.5"/>
+      ${grande ? `<text x="${px(lo).toFixed(1)}" y="${(py(la) + 4).toFixed(1)}" text-anchor="middle"
+        font-size="15" fill="#f5f0e8" font-family="Jura,sans-serif">${esc(c.cidade.slice(0, 11))}</text>` : ''}
+    </g>`;
+  }).join('');
+
+  return `<div class="sec mapa-sec">
+    <h3>Onde a BASP se move</h3>
+    <div class="desc">Tamanho é faturamento dos últimos 12 meses. Cor é para onde está indo:
+      <b class="up">crescendo</b>, <b class="flat">estável</b>, <b class="down">caindo</b>,
+      <b class="new">cidade nova</b>. Toque num ponto.</div>
+    <svg viewBox="0 0 ${W} ${H}" class="mapa" role="img" aria-label="Mapa de calor da carteira">
+      ${halos}${pontos}
+    </svg>
+    ${renderMapaDetalhe()}
+    ${fora.length ? `<div class="nota">Sem posição no mapa: ${fora.map((c) => esc(c.cidade)).join(', ')}.</div>` : ''}
+  </div>`;
+}
+
+/** O que aparece ao tocar um ponto. Fica dentro do proprio card do mapa:
+ *  no celular, abrir outra tela para ler tres numeros custa mais do que vale. */
+function renderMapaDetalhe() {
+  if (!state.mapaSel) return '';
+  const [cid, uf] = state.mapaSel.split('|');
+  const c = (state.dados.cidades || []).find((x) => x.cidade === cid && x.uf === uf);
+  if (!c) return '';
+  const cor = corTendencia(c.variacao);
+  return `<div class="mapa-det">
+    <b>${esc(c.cidade)} <span class="cid">${esc(c.uf)}</span></b>
+    <span>${fmtMoney(c.total12)} nos últimos 12 meses</span>
+    <span style="color:${cor}">${c.variacao == null ? 'praça nova' :
+      (c.variacao > 0 ? '+' : '') + c.variacao + '% vs 12 anteriores'}</span>
+    <span>${c.clientes12} loja(s) comprando · ${c.fabricas} fábrica(s) ativas</span>
+  </div>`;
+}
+
+function renderEstados() {
+  const est = (state.dados.estados || []).filter((e) => e.total12 > 0 || e.total12ant > 0);
+  if (!est.length) return '';
+  const maior = Math.max(...est.map((e) => e.total12), 1);
+  return `<div class="sec">
+    <h3>Estados</h3>
+    <div class="desc">A barra é o tamanho. A cor é o rumo.</div>
+    ${est.map((e) => `<div class="uf-linha">
+      <span class="uf-nome">${esc(e.uf)}</span>
+      <span class="uf-barra"><i style="width:${Math.max(2, Math.round((e.total12 / maior) * 100))}%;
+        background:${corTendencia(e.variacao)}"></i></span>
+      <span class="uf-val">${fmtCurto(e.total12)}</span>
+      <span class="uf-var" style="color:${corTendencia(e.variacao)}">${
+        e.variacao == null ? 'nova' : (e.variacao > 0 ? '+' : '') + e.variacao + '%'}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function renderSerie() {
+  const s = state.dados.serie || [];
+  if (s.length < 4) return '';
+  const W = 1000, H = 300, pad = 26;
+  const maior = Math.max(...s.map((x) => x.valor), 1);
+  const x = (i) => pad + (i / (s.length - 1)) * (W - pad * 2);
+  const y = (v) => H - pad - (v / maior) * (H - pad * 2);
+
+  const linha = s.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ');
+  const area = `${linha} L${x(s.length - 1).toFixed(1)},${H - pad} L${x(0).toFixed(1)},${H - pad} Z`;
+  // divisa entre os 12 meses anteriores e os 12 atuais
+  const corte = x(s.length - 12);
+  const rotulos = s.map((p, i) => (i % 3 === 0 || i === s.length - 1)
+    ? `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="15"
+        fill="rgba(245,240,232,0.45)" font-family="Jura,sans-serif">${p.mes.slice(5)}/${p.mes.slice(2, 4)}</text>` : '').join('');
+
+  const doze = s.slice(-12).reduce((a, b) => a + b.valor, 0);
+  const dozeAnt = s.slice(0, 12).reduce((a, b) => a + b.valor, 0);
+
+  return `<div class="sec">
+    <h3>24 meses, mês a mês</h3>
+    <div class="desc">A linha vertical separa os 12 meses anteriores dos 12 atuais.
+      Depois da linha: ${fmtCurto(doze)} · antes: ${fmtCurto(dozeAnt)}.</div>
+    <svg viewBox="0 0 ${W} ${H}" class="serie" role="img" aria-label="Faturamento mês a mês">
+      <defs><linearGradient id="gserie" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#d2af78" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="#d2af78" stop-opacity="0.02"/>
+      </linearGradient></defs>
+      <line x1="${corte.toFixed(1)}" y1="${pad - 10}" x2="${corte.toFixed(1)}" y2="${H - pad}"
+        stroke="rgba(210,175,120,0.45)" stroke-width="1.5" stroke-dasharray="5 5"/>
+      <path d="${area}" fill="url(#gserie)"/>
+      <path d="${linha}" fill="none" stroke="#e8d5a3" stroke-width="2.5"
+        stroke-linejoin="round" stroke-linecap="round"/>
+      ${rotulos}
+    </svg>
+  </div>`;
+}
+
+/** Matriz fábrica × cidade: onde cada fábrica é forte e onde nunca entrou.
+ *  Célula vazia aqui não é falta de dado — é campo livre. */
+function renderMatriz() {
+  const d = state.dados;
+  const fabs = d.fabricas.filter((f) => !f.arquivada && f.total12 > 0).slice(0, 9);
+  const cids = (d.cidades || []).slice(0, 10);
+  if (!fabs.length || !cids.length) return '';
+
+  const val = {};
+  let maior = 1;
+  fabs.forEach((f) => (f.cidades || []).forEach((c) => {
+    const k = `${f.nome}|${c.cidade}`;
+    val[k] = c.total12;
+    if (c.total12 > maior) maior = c.total12;
+  }));
+
+  const cab = cids.map((c) => `<th class="mx-cid"><span>${esc(c.cidade.slice(0, 12))}</span></th>`).join('');
+  const linhas = fabs.map((f) => `<tr>
+    <th class="mx-fab">${esc(f.nome)}</th>
+    ${cids.map((c) => {
+      const v = val[`${f.nome}|${c.cidade}`] || 0;
+      const i = v ? 0.12 + (Math.sqrt(v / maior) * 0.75) : 0;
+      return `<td class="mx-cel" title="${esc(f.nome)} em ${esc(c.cidade)}: ${fmtMoney(v)}"
+        style="background:rgba(210,175,120,${i.toFixed(3)})">${v ? '' : '·'}</td>`;
+    }).join('')}
+  </tr>`).join('');
+
+  return `<div class="sec">
+    <h3>Fábrica por cidade</h3>
+    <div class="desc">Quanto mais dourado, mais forte. Ponto cinza é praça onde essa
+      fábrica ainda não entrou — é campo livre, não erro de dado.</div>
+    <div class="mx-wrap"><table class="mx">
+      <tr><th></th>${cab}</tr>
+      ${linhas}
+    </table></div>
+  </div>`;
+}
+
+function renderPainel() {
+  return `${renderMapa()}${renderEstados()}${renderSerie()}${renderMatriz()}`;
+}
+
 function renderLista() {
   const d = state.dados;
   const r = d.resumo;
@@ -512,6 +767,7 @@ function renderLista() {
   }).join('');
 
   return `${renderTopo()}
+  ${renderPainel()}
   <div class="resumo">
     <div class="rbox"><div class="rot">Últimos 12 meses</div>
       <div class="val">${fmtCurto(r.total12)}</div>
@@ -706,6 +962,13 @@ function ligar() {
     el.addEventListener('click', () => {
       state.fabrica = decodeURIComponent(el.getAttribute('data-fab'));
       state.tela = 'fabrica'; window.scrollTo(0, 0); render();
+    });
+  });
+  document.querySelectorAll('[data-mapa]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const k = decodeURIComponent(el.getAttribute('data-mapa'));
+      state.mapaSel = state.mapaSel === k ? null : k; // tocar de novo fecha
+      render();
     });
   });
   document.querySelectorAll('[data-cidade]').forEach((el) => {

@@ -1,4 +1,4 @@
 {
   "build": "2026-08-01T13:40",
-  "nota": "Trocar a cada publicacao do painel. O modulo-rotas.html compara com a constante BUILD embutida nele e se recarrega sozinho quando os dois divergem - foi assim que o Ctrl+Shift+R deixou de ser necessario."
+  "nota": "TEM QUE SER IGUAL a constante BUILD dentro do modulo-rotas.html. Se este arquivo avancar e o BUILD nao, o painel recarrega, ve a mesma versao, recarrega de novo - laco infinito no celular do Bruno. Mudar os dois juntos, sempre."
 }
