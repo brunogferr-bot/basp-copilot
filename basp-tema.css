@@ -1,0 +1,223 @@
+/* =====================================================================
+ * BASP — tema único do ecossistema
+ *
+ * POR QUE ESTE ARQUIVO EXISTE
+ * Cada módulo nasceu com a própria paleta clara e o Bruno viu a costura:
+ * clicava em Rotas e caía num app com cara de outro produto. A partir de
+ * 31/07/2026 o desenho é UM SÓ — o do Studio: fundo escuro com a foto que
+ * ele escolheu, vidro fosco, aro dourado, Italiana nos títulos e Jura no
+ * corpo.
+ *
+ * COMO FUNCIONA
+ * Os módulos já usavam variáveis CSS (--bg, --card, --ink, --border...).
+ * Este arquivo entra DEPOIS do <style> de cada módulo e reescreve essas
+ * variáveis para os tokens do Studio. O componente não precisa saber de
+ * nada: ele continua pedindo var(--card) e recebe vidro em vez de papel.
+ *
+ * Carregar assim, no <head>, sempre depois do CSS próprio do módulo:
+ *   <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Jura:wght@300;400;500;600;700&family=Crimson+Pro:ital@0;1&display=swap" rel="stylesheet">
+ *   <link rel="stylesheet" href="basp-tema.css">
+ *   <script src="basp-tema.js" defer></script>
+ *
+ * Tokens oficiais (não inventar variação): --bg #0d0b09 · --ivory #f5f0e8
+ * --gold #d2af78 · --gold-light #e8d5a3 · --gold-dark #a8853a
+ * vidro rgba(245,240,232,0.04) · aro rgba(210,175,120,0.18 / 0.35)
+ * blur 18px · raio 10px · hover scale(1.035)
+ * ===================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* --- tokens do Studio --- */
+  --ivory: #f5f0e8;
+  --glass: rgba(245, 240, 232, 0.04);
+  --glass-forte: rgba(245, 240, 232, 0.07);
+  --gb: rgba(210, 175, 120, 0.18);
+  --gbs: rgba(210, 175, 120, 0.35);
+
+  /* --- remapeamento do que os módulos já pedem --- */
+  --bg: #0d0b09;
+  --card: rgba(245, 240, 232, 0.04);
+  --ink: #f5f0e8;
+  --ink-soft: rgba(245, 240, 232, 0.58);
+  --text-muted: rgba(245, 240, 232, 0.45);
+  --muted: rgba(245, 240, 232, 0.58);
+  --border: rgba(210, 175, 120, 0.18);
+  --gold: #d2af78;
+  --gold-light: #e8d5a3;
+  --gold-dark: #a8853a;
+  --radius: 10px;
+
+  /* Status: os tons de papel não sobrevivem no escuro — clareados para
+     manter contraste, e os fundos viram véu translúcido. */
+  --urgente: #ff7a6b;      --urgente-bg: rgba(255, 122, 107, 0.12);
+  --atencao: #e8b54a;      --atencao-bg: rgba(232, 181, 74, 0.12);
+  --emdia: #7fd39b;        --emdia-bg: rgba(127, 211, 155, 0.12);
+  --semhist: #b9b2a4;      --semhist-bg: rgba(245, 240, 232, 0.06);
+  --inativo: #9a948a;      --inativo-bg: rgba(245, 240, 232, 0.05);
+  --up: #7fd39b;
+  --down: #ff7a6b;
+  --flat: #b9b2a4;
+  --new: #7cc4e8;
+}
+
+/* ---------- base ---------- */
+
+html, body { min-height: 100%; }
+
+body {
+  background: var(--bg) !important;
+  color: var(--ivory);
+  font-family: Jura, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Fundo: a foto que o Bruno escolheu no Studio, compartilhada por
+   localStorage. Fica atrás de tudo, levemente desfocada, com um véu
+   escuro por cima para o texto continuar legível. */
+#basp-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background-size: cover; background-position: center;
+  filter: blur(2px); transform: scale(1.03);
+  display: none;
+}
+#basp-bg-veu {
+  position: fixed; inset: 0; z-index: 0;
+  background: linear-gradient(160deg,
+    rgba(13, 11, 9, 0.80) 0%, rgba(13, 11, 9, 0.62) 45%, rgba(13, 11, 9, 0.86) 100%);
+  display: none;
+}
+body.tem-foto #basp-bg,
+body.tem-foto #basp-bg-veu { display: block; }
+
+/* Sem foto, o ambiente dourado do Studio entra no lugar. */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 25% 15%, rgba(210, 175, 120, 0.10), transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(168, 133, 58, 0.08), transparent 55%);
+}
+body.tem-foto::before { display: none; }
+
+/* Todo o conteúdo sobe acima das camadas de fundo. */
+#app, .wrap, main, header, footer { position: relative; z-index: 1; }
+
+/* ---------- tipografia ---------- */
+
+h1, h2, h3, .brand, .fnome, .titulo {
+  font-family: Italiana, Georgia, serif;
+  letter-spacing: .06em;
+  font-weight: 400;
+}
+.brand { letter-spacing: .14em; }
+.val, .rbox .val, .fvar, td.num, th.num { font-family: Jura, sans-serif; }
+
+/* ---------- vidro ---------- */
+
+.glass, .card, .sec, .fcard, .rbox, .acao, .box,
+.cliente-card, .detalhe, .painel, .modal, .sheet {
+  background: var(--glass) !important;
+  border: 0.5px solid var(--gb) !important;
+  border-radius: var(--radius);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.fcard:hover, .card:hover, .cliente-card:hover {
+  border-color: var(--gbs) !important;
+  transform: scale(1.012);
+  transition: transform .18s ease, border-color .18s ease;
+}
+
+/* ---------- controles ---------- */
+
+.btn, button, .chip {
+  font-family: Jura, sans-serif;
+  background: var(--glass);
+  border: 0.5px solid var(--gb);
+  color: var(--ivory);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all .18s ease;
+}
+.btn:hover, button:hover, .chip:hover {
+  border-color: var(--gbs);
+  background: var(--glass-forte);
+}
+.btn-primary, .chip.on, button.primario {
+  background: rgba(210, 175, 120, 0.16) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold-light) !important;
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+
+input, select, textarea {
+  background: rgba(245, 240, 232, 0.04);
+  border: 0.5px solid var(--gb);
+  color: var(--ivory);
+  border-radius: 8px;
+  font-family: Jura, sans-serif;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gbs);
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+select option { background: #16120e; color: var(--ivory); }
+
+/* ---------- tabelas e listas ---------- */
+
+table { color: var(--ivory); }
+th { color: var(--text-muted); }
+th, td { border-bottom: 1px solid var(--gb); }
+tr.clicavel:hover td { background: rgba(210, 175, 120, 0.07); }
+.lista div { border-bottom: 1px solid var(--gb); }
+.barra { background: rgba(245, 240, 232, 0.07); }
+.barra .a { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+.barra .b { background: rgba(245, 240, 232, 0.16); }
+
+/* ---------- avisos ---------- */
+
+.erro, .aviso-erro {
+  background: rgba(255, 122, 107, 0.10) !important;
+  border: 0.5px solid rgba(255, 122, 107, 0.35) !important;
+  color: #ffb3a8 !important;
+}
+.acao { border-left: 3px solid var(--gold) !important; border-radius: 0 var(--radius) var(--radius) 0; }
+.acao.urg { border-left-color: var(--down) !important; }
+.acao.opo { border-left-color: var(--new) !important; }
+.pensador { border-top: 1px dashed var(--gb); color: var(--text-muted); }
+.pensador b { color: var(--gold-light); }
+.selo { border: 1px solid var(--gb); color: var(--text-muted); }
+
+/* ---------- barra fixa de salvar ---------- */
+
+.salvar {
+  background: rgba(13, 11, 9, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid var(--gb);
+}
+
+/* ---------- rodapé de navegação entre módulos ---------- */
+
+.basp-voltar {
+  position: relative; z-index: 2;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: Jura, sans-serif; font-size: 12.5px;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--gold); text-decoration: none;
+  padding: 7px 13px; border-radius: 8px;
+  border: 0.5px solid var(--gb); background: var(--glass);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.basp-voltar:hover { border-color: var(--gbs); color: var(--gold-light); }
+
+/* ---------- celular ---------- */
+
+@media (max-width: 720px) {
+  .glass, .card, .sec, .fcard, .rbox { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.30); }
+}
