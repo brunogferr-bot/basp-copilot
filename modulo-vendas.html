@@ -688,7 +688,10 @@ function renderMapa() {
   const py = (lat) => ((lat1 - lat) / (lat1 - lat0)) * H;
 
   const maior = Math.max(...cidades.map((c) => c.total12), 1);
-  const raio = (v) => 8 + Math.sqrt(Math.max(v, 0) / maior) * 46;
+  /* Praca parada tem faturamento 12m zero. Se o raio saisse do zero ela
+   * viraria um ponto invisivel — e o objetivo dela no mapa e justamente ser
+   * vista. Entra com tamanho fixo pequeno e anel vazado. */
+  const raio = (v) => (v > 0 ? 8 + Math.sqrt(v / maior) * 46 : 9);
 
   // maiores por último, para o ponto grande não cobrir o pequeno
   const ordem = cidades.slice().sort((a, b) => b.total12 - a.total12);
@@ -697,6 +700,7 @@ function renderMapa() {
    * praca. Sao duas perguntas diferentes e o Bruno precisa das duas: uma
    * mostra para onde a cidade vai, a outra mostra de quem ela e. */
   const corDoPonto = (c) => {
+    if (c.tendencia === 'parada') return 'var(--flat)';
     if (state.mapaCor !== 'marca') return corTendencia(c.variacao);
     const m = marcaDominante(c.cidade, c.uf);
     return m ? corDaMarca(m.nome) : 'var(--flat)';
@@ -723,6 +727,7 @@ function renderMapa() {
 
   const halos = ordem.map((c) => {
     const [la, lo] = coordDe(c.cidade, c.uf);
+    if (c.tendencia === 'parada') return '';
     return `<circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${(raio(c.total12) * 1.9).toFixed(1)}"
       fill="${corDoPonto(c)}" opacity="0.13"/>`;
   }).join('');
@@ -757,16 +762,20 @@ function renderMapa() {
   const pontos = ordem.slice().reverse().map((c) => {
     const [la, lo] = coordDe(c.cidade, c.uf);
     const r = raio(c.total12);
+    const parada = c.tendencia === 'parada';
     return `<g class="pt" data-mapa="${encodeURIComponent(c.cidade + '|' + c.uf)}">
       <circle cx="${px(lo).toFixed(1)}" cy="${py(la).toFixed(1)}" r="${r.toFixed(1)}"
-        fill="${corDoPonto(c)}" opacity="0.55" stroke="${corDoPonto(c)}" stroke-width="1.5"/>
+        fill="${parada ? 'none' : corDoPonto(c)}" opacity="${parada ? 1 : 0.55}"
+        stroke="${corDoPonto(c)}" stroke-width="${parada ? 2 : 1.5}"
+        stroke-dasharray="${parada ? '3 3' : ''}"/>
     </g>`;
   }).join('');
 
   return `<div class="sec mapa-sec">
     <h3>Onde a BASP se move</h3>
-    <div class="desc">O tamanho do ponto é sempre o faturamento dos últimos 12 meses.
-      A cor muda conforme a pergunta:</div>
+    <div class="desc">Toda praça que já registrou pedido no Mercos, desde o começo.
+      O tamanho é o faturamento dos últimos 12 meses; quem está parada entra como
+      anel tracejado. A cor muda conforme a pergunta:</div>
     <div class="chips">
       <span class="chip ${state.mapaCor === 'tendencia' ? 'on' : ''}" data-mcor="tendencia">Para onde vai</span>
       <span class="chip ${state.mapaCor === 'marca' ? 'on' : ''}" data-mcor="marca">De quem é a praça</span>
@@ -790,7 +799,7 @@ function renderLegenda() {
       .slice().sort((a, b) => b.total12 - a.total12);
     return `<div class="legenda">
       ${fabs.map((f) => `<span class="lg"><i style="background:${corDaMarca(f.nome)}"></i>${esc(f.nome)}</span>`).join('')}
-      <span class="lg"><i style="background:var(--flat)"></i>sem venda nos 12 meses</span>
+      <span class="lg"><i style="background:transparent;border:2px dashed var(--flat)"></i>parada há mais de 2 anos</span>
     </div>
     <div class="nota">A cor é a marca que mais fatura naquela cidade. Toque no ponto
       para ver a fatia dela na praça.</div>`;
@@ -800,6 +809,7 @@ function renderLegenda() {
     <span class="lg"><i style="background:var(--flat)"></i>estável</span>
     <span class="lg"><i style="background:var(--down)"></i>caindo acima de 15%</span>
     <span class="lg"><i style="background:var(--new)"></i>praça nova, sem base de comparação</span>
+    <span class="lg"><i style="background:transparent;border:2px dashed var(--flat)"></i>já comprou, parada há mais de 2 anos</span>
   </div>`;
 }
 
@@ -813,9 +823,13 @@ function renderMapaDetalhe() {
   const cor = corTendencia(c.variacao);
   return `<div class="mapa-det">
     <b>${esc(c.cidade)} <span class="cid">${esc(c.uf)}</span></b>
-    <span>${fmtMoney(c.total12)} nos últimos 12 meses</span>
-    <span style="color:${cor}">${c.variacao == null ? 'praça nova' :
-      (c.variacao > 0 ? '+' : '') + c.variacao + '% vs 12 anteriores'}</span>
+    ${c.tendencia === 'parada'
+      ? `<span style="color:var(--flat)">Sem pedido nos últimos 24 meses</span>`
+      : `<span>${fmtMoney(c.total12)} nos últimos 12 meses</span>
+         <span style="color:${cor}">${c.variacao == null ? 'praça nova' :
+           (c.variacao > 0 ? '+' : '') + c.variacao + '% vs 12 anteriores'}</span>`}
+    <span>${fmtMoney(c.totalHistorico)} desde o primeiro pedido
+      · ${c.pedidosHistorico} pedido(s)${c.ultima ? ' · última em ' + c.ultima.split('-').reverse().join('/') : ''}</span>
     <span>${c.clientes12} loja(s) comprando · ${c.fabricas} fábrica(s) ativas</span>
     ${(() => { const m = marcaDominante(c.cidade, c.uf); return m
       ? `<span><i class="pt-marca" style="background:${corDaMarca(m.nome)}"></i>
