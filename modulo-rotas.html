@@ -618,9 +618,25 @@ async function doSync() {
     const mudou = antes && depois && antes !== depois;
 
     if (varreu && varreu.ok) {
+      // Relatorio por DIFERENCA. Repetir "264 clientes" a cada clique e
+      // ruido: o numero nunca muda e para de ser lido. So aparece o que
+      // mudou de fato; se nada mudou, o painel diz isso sem rodeio.
+      const partes = [];
+      if (varreu.novos) {
+        partes.push(`${varreu.novos} cliente${varreu.novos > 1 ? 's' : ''} novo${varreu.novos > 1 ? 's' : ''}`
+          + (varreu.clientes ? ` (${varreu.clientes} no total)` : ''));
+      } else if (varreu.atualizados) {
+        partes.push(`${varreu.atualizados} cliente${varreu.atualizados > 1 ? 's' : ''} com situação nova`);
+      }
+      if (varreu.variacao) {
+        const v = Number(varreu.variacao);
+        partes.push(`faturamento ${v > 0 ? '+' : ''}${fmtMoney(v)}`);
+      }
       state.syncMsg = {
         type: 'ok',
-        text: `Busquei no Mercos agora: ${varreu.clientes} clientes conferidos.`,
+        text: partes.length
+          ? 'Busquei no Mercos agora: ' + partes.join(' · ') + '.'
+          : 'Busquei no Mercos agora: nada mudou desde a última rodada.',
       };
     } else if (varreu && !varreu.ok) {
       state.syncMsg = {
