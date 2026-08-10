@@ -40,6 +40,8 @@ body.has-bg-photo #login{background:radial-gradient(ellipse at 30% 20%, rgba(210
 .login-btn{width:100%;margin-top:18px;padding:13px;border-radius:8px;border:0.5px solid var(--gold);background:rgba(210,175,120,0.12);color:var(--gold-light);font-family:Jura,sans-serif;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;transition:all .2s}
 .login-btn:hover{background:rgba(210,175,120,0.2);border-color:var(--gold-light)}
 .login-error{font-size:11px;color:#e2837e;margin-top:12px;letter-spacing:0.04em;min-height:14px}
+.login-status{font-size:12px;color:var(--muted);letter-spacing:0.06em;line-height:1.7;margin-top:8px}
+.login-status b{color:var(--gold-light);font-weight:600}
 .login-foot{font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-top:28px;text-transform:uppercase}
 
 /* ===== SPLASH — logo real ===== */
@@ -99,18 +101,9 @@ body.has-bg-photo #login{background:radial-gradient(ellipse at 30% 20%, rgba(210
 <div class="login-mark">BASP Copilot</div>
 </div>
 <div class="login-sub">Seu parceiro de neg&oacute;cios &middot; BASP Representa&ccedil;&otilde;es</div>
-<form id="login-form" autocomplete="off">
-<div class="login-field">
-<label class="login-label">Usu&aacute;rio</label>
-<input class="login-input" type="text" id="f-user" autocomplete="username">
-</div>
-<div class="login-field">
-<label class="login-label">Senha</label>
-<input class="login-input" type="password" id="f-pass" autocomplete="current-password">
-</div>
-<button type="submit" class="login-btn">Entrar</button>
+<div class="login-status" id="acesso-estado">Verificando seu acesso&hellip;</div>
 <div class="login-error" id="login-err"></div>
-</form>
+<button class="login-btn" id="btn-tentar" style="display:none">Tentar de novo</button>
 <div class="login-foot">BASP Representa&ccedil;&otilde;es</div>
 </div>
 </div>
@@ -227,10 +220,71 @@ var cons=document.querySelectorAll(".construcao");
 for(var i=0;i<cons.length;i++){var nome=cons[i].getAttribute("data-nome");cons[i].innerHTML='<div class="glass detail-card">'+gearSvg+'<div class="detail-title brand">'+nome+'</div><div class="detail-sub">Em construção — em breve no seu BASP Copilot.</div><button class="linklike" data-go="hub">← Voltar aos módulos</button></div>'}
 document.addEventListener("click",function(e){var el=e.target.closest("[data-go]");if(el){show(el.getAttribute("data-go"))}});
 
-/* ===== LOGIN UNICO (Copilot + Studio compartilham a sessao) ===== */
-function doLogin(e){if(e)e.preventDefault();var u=$("f-user").value.trim().toLowerCase(),p=$("f-pass").value;if(u==="bruno"&&p==="basp2024"){sessionStorage.setItem("basp_copilot_auth","1");sessionStorage.setItem("basp_auth","1");$("login-err").textContent="";runSplash()}else{$("login-err").textContent="Usuário ou senha incorretos."}}
-$("login-form").addEventListener("submit",doLogin);
-$("btn-sair").addEventListener("click",function(){sessionStorage.removeItem("basp_copilot_auth");sessionStorage.removeItem("basp_auth");show("login")});
+/* ===== ACESSO =====
+ *
+ * Ate 10/08/2026 este arquivo trazia usuario e senha em texto puro. Como o
+ * repositorio basp-copilot e PUBLICO, a senha estava legivel por qualquer um
+ * em raw.githubusercontent.com - e num site estatico nao existe jeito de
+ * esconder: tudo que o navegador le, o mundo le. Guardar hash so adia o
+ * problema, porque senha curta cai em dicionario.
+ *
+ * A saida foi parar de fingir. Quem de fato protege copilot.basp.com.br e o
+ * Cloudflare Access, que autentica por e-mail antes da pagina sequer carregar.
+ * Aqui a gente so PERGUNTA ao Cloudflare quem entrou, pelo endpoint
+ * /cdn-cgi/access/get-identity. Nao ha segredo nenhum neste arquivo.
+ *
+ * Quem decide o que vale e a politica do Access no painel da Cloudflare. Por
+ * isso nao repetimos a lista de e-mails aqui: duas listas viram duas verdades,
+ * e a que esta no repositorio publico sempre fica velha.
+ *
+ * Falha fecha, nao abre. Se o Access nao responder, ninguem entra e a tela
+ * explica o porque. Ficar de fora se conserta; ficar aberto, nao.
+ */
+var ACCESS_ID = "/cdn-cgi/access/get-identity";
+var ACCESS_LOGOUT = "/cdn-cgi/access/logout";
+
+function liberar(email){
+  sessionStorage.setItem("basp_copilot_auth","1");
+  sessionStorage.setItem("basp_auth","1");            /* o Studio le esta chave */
+  if(email){try{sessionStorage.setItem("basp_email",email)}catch(e){}}
+  $("login-err").textContent="";
+  runSplash();
+}
+
+function barrar(motivo){
+  sessionStorage.removeItem("basp_copilot_auth");
+  sessionStorage.removeItem("basp_auth");
+  $("acesso-estado").innerHTML="Acesso protegido pelo <b>Cloudflare Access</b>.";
+  $("login-err").textContent=motivo;
+  $("btn-tentar").style.display="block";
+  show("login");
+}
+
+async function conferirAcesso(){
+  $("btn-tentar").style.display="none";
+  $("login-err").textContent="";
+  $("acesso-estado").innerHTML="Verificando seu acesso&hellip;";
+  try{
+    var r=await fetch(ACCESS_ID,{credentials:"include",cache:"no-store"});
+    if(!r.ok){barrar("O Cloudflare Access nao confirmou a sessao (erro "+r.status+"). Recarregue a pagina para entrar de novo.");return}
+    var d=await r.json();
+    if(!d||!d.email){barrar("O Cloudflare Access respondeu sem identificar o usuario.");return}
+    $("acesso-estado").innerHTML="Entrando como <b>"+String(d.email).replace(/</g,"&lt;")+"</b>";
+    liberar(d.email);
+  }catch(e){
+    barrar("Nao foi possivel falar com o Cloudflare Access. Se voce removeu o Access do dominio, o painel fica sem porteiro e nao abre.");
+  }
+}
+
+$("btn-tentar").addEventListener("click",conferirAcesso);
+$("btn-sair").addEventListener("click",function(){
+  sessionStorage.removeItem("basp_copilot_auth");
+  sessionStorage.removeItem("basp_auth");
+  sessionStorage.removeItem("basp_email");
+  /* Sair de verdade e encerrar a sessao do Access. So limpar o sessionStorage
+   * deixaria o proximo carregamento entrar sozinho de novo. */
+  window.location.href=ACCESS_LOGOUT;
+});
 function runSplash(){show("splash");setTimeout(function(){show("hub")},3200)}
 
 /* ===== FUNDO (foto do Studio em todas as telas) ===== */
@@ -249,7 +303,7 @@ $("bg-remove").addEventListener("click",function(){try{localStorage.removeItem(L
 
 /* boot */
 loadBg();
-if(sessionStorage.getItem("basp_copilot_auth")==="1"){runSplash()}else{show("login")}
+if(sessionStorage.getItem("basp_copilot_auth")==="1"){runSplash()}else{show("login");conferirAcesso()}
 })();
 </script>
 </body>
