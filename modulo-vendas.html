@@ -43,6 +43,35 @@
   .idade-dado.alerta{border-color:#c05c52;background:rgba(192,92,82,.12);color:var(--ink)}
   .idade-dado.alerta .pt{background:#c05c52;animation:pulsa 1.8s ease-in-out infinite}
   @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
+  /* ===== O MES POR DENTRO ===== */
+  .mes{margin:16px 0 0;padding:18px 16px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+  .mes h3{margin:0 0 2px;font-size:17px;letter-spacing:.01em}
+  .mes .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;line-height:1.5}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin-bottom:18px}
+  .kpi{padding:12px 13px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02)}
+  .kpi .rot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  .kpi .val{font-size:23px;font-weight:700;margin:5px 0 3px;letter-spacing:-.02em}
+  .kpi .pe{font-size:12px;color:var(--ink-soft);line-height:1.45}
+  .kpi.destaque{border-color:var(--gold)}
+  .up{color:#4fbf7e}.down{color:#e0796d}.neutro{color:var(--ink-soft)}
+
+  .barras{width:100%;height:190px;display:block;margin-bottom:6px}
+  .leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);margin-bottom:18px}
+  .leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  .fab-linha{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:baseline;
+    padding:9px 0;border-top:1px solid var(--border)}
+  .fab-linha .nome{font-size:13.5px;font-weight:600}
+  .fab-linha .num{font-size:12.5px;color:var(--ink-soft);text-align:right;white-space:nowrap}
+  .fab-linha .trilho{grid-column:1/-1;height:7px;border-radius:4px;background:rgba(255,255,255,.06);
+    position:relative;overflow:hidden}
+  .fab-linha .trilho i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold)}
+  .fab-linha .trilho u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-soft);opacity:.75}
+
+  .acoes{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+  .acao{display:flex;gap:10px;padding:9px 0;font-size:13.5px;line-height:1.5}
+  .acao .mk{flex:none;width:6px;height:6px;border-radius:50%;margin-top:7px;background:var(--gold)}
+  .acao b{font-weight:600}
 
   .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
   .rbox{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 13px}
@@ -199,7 +228,7 @@ async function apiFetch(path) {
 
 const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
   perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia', malhas: null,
-  meta: null };
+  meta: null, indic: null };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -495,6 +524,256 @@ function idadeDoDado() {
       + 'Não decida visita por esta tela. Quase sempre é o PC do escritório desligado.',
     quando,
   };
+}
+
+/* ===== O MES POR DENTRO =====
+ *
+ * Vinha faltando a pergunta que o Bruno faz todo dia na estrada: quanto entrou
+ * hoje, quanto ja tem no mes, e isso esta acima ou abaixo do normal. A tela so
+ * sabia responder em janela de 12 meses.
+ *
+ * DE ONDE VEM O OBJETIVO. O Mercos nao tem meta cadastrada - objetivo_do_dia
+ * e objetivo_do_mes voltam nulos. Entao a regua nasce do proprio historico:
+ * a media do MESMO MES nos 3 anos anteriores, fabrica a fabrica.
+ *
+ * Tres anos, e nao todos os disponiveis, por decisao do Bruno em 10/08/2026:
+ * agosto de 2021 fez R$ 2,9 mi contra R$ 832 mil em 2025. Misturar os dois
+ * cria o alvo de uma empresa que nao existe mais, e o painel viraria derrota
+ * diaria - numero que desanima nao corrige rota.
+ *
+ * SEM DESCONTAR FIM DE SEMANA, tambem por decisao dele: sabado e domingo
+ * represam pedido que a Gisele lanca na segunda. Tirar esses dias da conta
+ * inflaria o objetivo diario e faria toda segunda parecer fracasso.
+ *
+ * SO FABRICAS ATIVAS entram no alvo. Cobrar receita que nao tem como voltar e
+ * inventar divida. "Ativa" aqui e a mesma definicao do resto do modulo:
+ * faturou nos ultimos 12 meses. A definicao mora num lugar so.
+ *
+ * A PROJECAO NAO E PROMESSA. tendencia e regra de tres do ritmo ate agora.
+ * No dia 3 ela oscila muito; a tela avisa isso em vez de fingir precisao.
+ */
+
+/* Nomes vem de duas fontes: o widget do Mercos manda a razao social
+ * ("DELTA MOVEIS INTERIORES LTDA") e a analise usa o nome curto. Sem esta
+ * normalizacao a Delta aparece como fabrica sem objetivo e o alvo do mes sai
+ * menor do que e. */
+function chaveFab(nome) {
+  return String(nome || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\b(LTDA|ME|EPP|EIRELI|S\/?A)\b/g, '')
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function calcMes() {
+  const ind = state.indic;
+  if (!ind || ind.vazio || !Array.isArray(ind.dias) || !ind.dias.length) return null;
+
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const diaHoje = Number(hoje.slice(8, 10));
+  const doMesAtual = ind.mes === hoje.slice(0, 7);
+
+  const dias = ind.dias.slice().sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  const diasDoMes = (ind.base && ind.base.diasDoMes) || dias.length;
+  const corridos = doMesAtual ? Math.min(diaHoje, diasDoMes) : diasDoMes;
+
+  const ate = (n) => dias.slice(0, n).reduce((s, d) => s + (d.valor || 0), 0);
+  const acumulado = ate(corridos);
+  const hojeValor = (dias.find((d) => d.dia === hoje) || {}).valor || 0;
+
+  const anoPassadoMes = dias.reduce((s, d) => s + (d.anoPassado || 0), 0);
+  const anoPassadoAte = dias.slice(0, corridos).reduce((s, d) => s + (d.anoPassado || 0), 0);
+
+  /* Ativas: as que a propria analise ja mostra com faturamento nos 12 meses. */
+  const ativas = new Set(
+    ((state.dados && state.dados.fabricas) || [])
+      .filter((f) => (f.total12 || 0) > 0)
+      .map((f) => chaveFab(f.nome))
+  );
+
+  const realizadoPorFab = {};
+  (ind.fabricas || []).forEach((f) => { realizadoPorFab[chaveFab(f.nome)] = (realizadoPorFab[chaveFab(f.nome)] || 0) + (f.valor || 0); });
+
+  const base = (ind.base && ind.base.fabricas) || [];
+  const linhas = [];
+  const vistos = new Set();
+  base.forEach((b) => {
+    const k = chaveFab(b.nome);
+    if (!ativas.has(k)) return;              // fabrica que parou nao gera alvo
+    vistos.add(k);
+    linhas.push({ nome: b.nome, alvo: b.media || 0, feito: realizadoPorFab[k] || 0 });
+  });
+  /* Vendeu este mes mas nao tem historico no mesmo mes: entra com alvo zero,
+   * senao some da tela justamente quem esta trazendo dinheiro novo. */
+  (ind.fabricas || []).forEach((f) => {
+    const k = chaveFab(f.nome);
+    if (vistos.has(k)) return;
+    vistos.add(k);
+    linhas.push({ nome: f.nome, alvo: 0, feito: f.valor || 0 });
+  });
+  linhas.sort((a, b) => (b.alvo + b.feito) - (a.alvo + a.feito));
+
+  const objetivoMes = linhas.reduce((s, l) => s + l.alvo, 0);
+  const objetivoDia = diasDoMes ? objetivoMes / diasDoMes : 0;
+  const esperadoAte = objetivoDia * corridos;
+  const tendencia = corridos ? (acumulado / corridos) * diasDoMes : 0;
+  const faltam = Math.max(0, diasDoMes - corridos);
+  const precisaPorDia = faltam ? Math.max(0, objetivoMes - acumulado) / faltam : 0;
+
+  return {
+    mes: ind.mes, dias, diasDoMes, corridos, faltam, doMesAtual,
+    hojeValor, acumulado, objetivoMes, objetivoDia, esperadoAte, tendencia, precisaPorDia,
+    anoPassadoMes, anoPassadoAte, linhas, anos: (ind.base && ind.base.anos) || [],
+    atualizadoEm: ind.atualizadoEm || null,
+  };
+}
+
+/* Barras do mes: uma coluna por dia. Barra cheia e o realizado; o traco claro
+ * atras e o mesmo dia do ano passado; a linha horizontal e o objetivo diario.
+ * Dias futuros ficam so com a sombra do ano passado - da para ver o que
+ * costuma vir pela frente sem fingir que ja veio. */
+function renderBarras(m) {
+  const L = 26, R = 8, T = 10, B = 20, W = 700, H = 190;
+  const larg = (W - L - R) / m.diasDoMes;
+  const teto = Math.max(
+    ...m.dias.map((d) => Math.max(d.valor || 0, d.anoPassado || 0)),
+    m.objetivoDia * 1.4, 1
+  );
+  const y = (v) => T + (H - T - B) * (1 - v / teto);
+
+  const cols = m.dias.map((d, i) => {
+    const x = L + i * larg;
+    const n = Number(d.dia.slice(8, 10));
+    const passou = !m.doMesAtual || n <= m.corridos;
+    const w = Math.max(2, larg - 3);
+    const ap = d.anoPassado || 0;
+    const at = d.valor || 0;
+    const cor = at >= m.objetivoDia ? '#4fbf7e' : '#c9a24a';
+    return `
+      ${ap ? `<rect x="${x + 1}" y="${y(ap)}" width="${w}" height="${H - B - y(ap)}" fill="currentColor" opacity=".13" rx="2"/>` : ''}
+      ${passou && at ? `<rect x="${x + 1}" y="${y(at)}" width="${w}" height="${H - B - y(at)}" fill="${cor}" rx="2"/>` : ''}
+      ${n % 5 === 0 || n === 1 ? `<text x="${x + larg / 2}" y="${H - 6}" font-size="9" fill="currentColor" opacity=".55" text-anchor="middle">${n}</text>` : ''}`;
+  }).join('');
+
+  return `<svg class="barras" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+    aria-label="Venda dia a dia do mes">
+    ${cols}
+    <line x1="${L}" x2="${W - R}" y1="${y(m.objetivoDia)}" y2="${y(m.objetivoDia)}"
+      stroke="currentColor" stroke-opacity=".5" stroke-dasharray="4 4"/>
+    <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="currentColor" stroke-opacity=".25"/>
+  </svg>`;
+}
+
+/* O que fazer. Cada frase nasce de uma comparacao entre dois numeros desta
+ * tela - nada de conselho generico. Se nao houver nada digno de nota, e melhor
+ * a lista vir curta do que inventar recomendacao. */
+function acoesDoMes(m) {
+  const A = [];
+  const dif = m.acumulado - m.esperadoAte;
+
+  if (m.faltam && m.precisaPorDia > 0) {
+    A.push(`Faltam <b>${m.faltam} dia${m.faltam > 1 ? 's' : ''}</b> e <b>${fmtMoney(Math.max(0, m.objetivoMes - m.acumulado))}</b> para igualar a média dos ${m.anos.length} anos. Dá <b>${fmtMoney(m.precisaPorDia)} por dia</b> — hoje o ritmo é ${fmtMoney(m.corridos ? m.acumulado / m.corridos : 0)}.`);
+  }
+
+  const paradas = m.linhas.filter((l) => l.alvo > 0 && l.feito === 0).sort((a, b) => b.alvo - a.alvo).slice(0, 3);
+  if (paradas.length) {
+    A.push(`Sem <u>nenhum</u> pedido este mês, mas com histórico: <b>${paradas.map((p) => p.nome).join(', ')}</b>. Só a primeira vale ${fmtMoney(paradas[0].alvo)} de média — é a maior alavanca isolada da tela.`);
+  }
+
+  const atrasadas = m.linhas
+    .filter((l) => l.alvo > 0 && l.feito > 0 && l.feito < l.alvo * (m.corridos / m.diasDoMes) * 0.7)
+    .sort((a, b) => (b.alvo - b.feito) - (a.alvo - a.feito)).slice(0, 3);
+  if (atrasadas.length) {
+    A.push(`Abaixo do próprio ritmo: ${atrasadas.map((f) => `<b>${f.nome}</b> (${fmtCurto(f.feito)} de ${fmtCurto(f.alvo)})`).join(' · ')}.`);
+  }
+
+  const adiante = m.linhas.filter((l) => l.alvo > 0 && l.feito >= l.alvo).sort((a, b) => (b.feito - b.alvo) - (a.feito - a.alvo)).slice(0, 2);
+  if (adiante.length) {
+    A.push(`Já passaram a média do mês inteiro: ${adiante.map((f) => `<b>${f.nome}</b> (${fmtCurto(f.feito)})`).join(' · ')}. Vale entender o que mudou aí e repetir nas outras praças.`);
+  }
+
+  const novas = m.linhas.filter((l) => l.alvo === 0 && l.feito > 0);
+  if (novas.length) {
+    A.push(`Receita nova, sem histórico neste mês: ${novas.map((f) => `<b>${f.nome}</b> (${fmtCurto(f.feito)})`).join(' · ')}. Não estava no alvo e entrou mesmo assim.`);
+  }
+
+  if (m.anoPassadoAte) {
+    const v = Math.round(((m.acumulado - m.anoPassadoAte) / m.anoPassadoAte) * 100);
+    A.push(`Contra o mesmo trecho do ano passado: <b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v}%</b> (${fmtCurto(m.acumulado)} contra ${fmtCurto(m.anoPassadoAte)}).`);
+  }
+
+  if (dif < 0 && m.corridos <= 3) {
+    A.push('Só passaram poucos dias do mês — a projeção ainda balança muito. Não vale mudar rota por ela ainda.');
+  }
+  return A;
+}
+
+function renderMes() {
+  const m = calcMes();
+  if (!m) {
+    return `<div class="mes"><h3>O mês por dentro</h3>
+      <div class="sub">Ainda não chegaram os indicadores diários do Mercos. Eles entram na próxima
+      sincronização — se demorar, é sinal de que a extensão do Chrome está parada.</div></div>`;
+  }
+
+  const dif = m.acumulado - m.esperadoAte;
+  const pct = m.objetivoMes ? Math.round((m.acumulado / m.objetivoMes) * 100) : 0;
+  const clsDif = dif >= 0 ? 'up' : 'down';
+  const clsTend = m.tendencia >= m.objetivoMes ? 'up' : 'down';
+  const nomeMes = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+    .format(new Date(m.mes + '-15T12:00:00Z'));
+
+  const fabs = m.linhas.filter((l) => l.alvo > 0 || l.feito > 0).slice(0, 14).map((l) => {
+    const teto = Math.max(l.alvo, l.feito, 1);
+    const pf = Math.min(100, (l.feito / teto) * 100);
+    const pa = Math.min(100, (l.alvo / teto) * 100);
+    const razao = l.alvo ? Math.round((l.feito / l.alvo) * 100) : null;
+    return `<div class="fab-linha">
+      <div class="nome">${esc(l.nome)}</div>
+      <div class="num">${fmtCurto(l.feito)}${l.alvo ? ` <span class="neutro">de ${fmtCurto(l.alvo)}</span>` : ' <span class="neutro">sem alvo</span>'}${razao != null ? ` · <span class="${razao >= 100 ? 'up' : razao >= 60 ? 'neutro' : 'down'}">${razao}%</span>` : ''}</div>
+      <div class="trilho"><i style="width:${pf}%"></i>${l.alvo ? `<u style="left:${pa}%"></u>` : ''}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="mes">
+    <h3>O mês por dentro — ${esc(nomeMes)}</h3>
+    <div class="sub">O objetivo não vem do Mercos: lá não existe meta cadastrada. Ele é a média deste
+      mesmo mês em ${m.anos.join(', ')}, fábrica a fábrica, contando só as que ainda vendem, dividida
+      pelos ${m.diasDoMes} dias. Sábado e domingo contam como dia normal — o que represa no fim de
+      semana entra na segunda.</div>
+
+    <div class="kpis">
+      <div class="kpi destaque"><div class="rot">Hoje</div>
+        <div class="val">${fmtCurto(m.hojeValor)}</div>
+        <div class="pe">objetivo do dia ${fmtCurto(m.objetivoDia)}</div></div>
+      <div class="kpi"><div class="rot">Acumulado do mês</div>
+        <div class="val">${fmtCurto(m.acumulado)}</div>
+        <div class="pe ${clsDif}">${dif >= 0 ? '+' : ''}${fmtCurto(dif)} vs o esperado até o dia ${m.corridos}</div></div>
+      <div class="kpi"><div class="rot">Objetivo do mês</div>
+        <div class="val">${fmtCurto(m.objetivoMes)}</div>
+        <div class="pe">${pct}% alcançado</div></div>
+      <div class="kpi"><div class="rot">Tendência de fechamento</div>
+        <div class="val ${clsTend}">${fmtCurto(m.tendencia)}</div>
+        <div class="pe">projeção pelo ritmo, não promessa</div></div>
+    </div>
+
+    ${renderBarras(m)}
+    <div class="leg">
+      <span><i style="background:#4fbf7e"></i>dia acima do objetivo</span>
+      <span><i style="background:#c9a24a"></i>dia abaixo</span>
+      <span><i style="background:currentColor;opacity:.2"></i>mesmo dia do ano passado</span>
+      <span>— — objetivo diário</span>
+    </div>
+
+    <div class="rot" style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px">Fábrica a fábrica neste mês</div>
+    ${fabs}
+
+    <div class="acoes">
+      ${acoesDoMes(m).map((a) => `<div class="acao"><span class="mk"></span><span>${a}</span></div>`).join('')}
+    </div>
+  </div>`;
 }
 
 function renderIdade() {
@@ -1066,6 +1345,7 @@ function renderLista() {
   }).join('');
 
   return `${renderTopo()}
+  ${renderMes()}
   ${renderPainel()}
   <div class="resumo">
     <div class="rbox"><div class="rot">Últimos 12 meses</div>
@@ -1297,11 +1577,20 @@ async function carregarMeta() {
   }
 }
 
+async function carregarIndicadores() {
+  try {
+    state.indic = await apiFetch('/api/indicadores');
+  } catch (e) {
+    state.indic = null;
+  }
+}
+
 async function carregar() {
   // A malha nao bloqueia a tela: o mapa aparece com os pontos e o contorno
   // entra assim que chegar.
   carregarMalhas().then(() => { if (state.dados) render(); }).catch(() => {});
   carregarMeta().then(() => { if (state.dados) render(); });
+  carregarIndicadores().then(() => { if (state.dados) render(); });
 
   state.erro = null; state.dados = null; render();
   try {
