@@ -26,6 +26,23 @@
   .btn-primary{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
   .btn-sm{padding:5px 10px;font-size:12.5px}
   .nota{font-size:12px;color:var(--ink-soft);margin-top:8px}
+  /* ===== SELO DE IDADE DO DADO =====
+   * Entre 2 e 9 de agosto de 2026 o sync nao rodou nenhuma vez e esta tela
+   * continuou mostrando numeros com cara de novos. Quem le no carro nao tem
+   * como desconfiar. Este selo existe para que dado velho nunca mais pareca
+   * novo: ele fica no topo, antes de qualquer numero, e muda de cor sozinho.
+   * Nao usar `geradoEm` da analise aqui - aquilo e a hora em que o servidor
+   * recalculou, e sobe todo dia mesmo sem nenhum contato com o Mercos. */
+  .idade-dado{display:flex;align-items:center;gap:9px;margin:12px 0 0;
+    padding:9px 12px;border-radius:9px;font-size:13px;
+    border:1px solid var(--border);background:var(--card);color:var(--ink-soft)}
+  .idade-dado .pt{width:8px;height:8px;border-radius:50%;flex:none;background:#3fa66a}
+  .idade-dado b{color:var(--ink);font-weight:600}
+  .idade-dado.atencao{border-color:#c99a3e;background:rgba(201,154,62,.10);color:var(--ink)}
+  .idade-dado.atencao .pt{background:#c99a3e}
+  .idade-dado.alerta{border-color:#c05c52;background:rgba(192,92,82,.12);color:var(--ink)}
+  .idade-dado.alerta .pt{background:#c05c52;animation:pulsa 1.8s ease-in-out infinite}
+  @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
 
   .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
   .rbox{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 13px}
@@ -181,7 +198,8 @@ async function apiFetch(path) {
 }
 
 const state = { dados: null, erro: null, tela: 'lista', fabrica: null, cidade: null, filtro: 'todas',
-  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia', malhas: null };
+  perfis: null, rascunho: null, salvando: false, msg: null, mapaSel: null, mapaCor: 'tendencia', malhas: null,
+  meta: null };
 
 /* ---------- formatacao ---------- */
 const fmtMoney = (n) => (n == null ? '--' :
@@ -410,8 +428,80 @@ function renderTopo() {
       <button class="btn btn-sm" id="btn-perfis">👥 Perfis</button>
       <button class="btn btn-sm" id="btn-recarregar">⟳ Atualizar</button>
     </div>
-  </div>`;
+  </div>
+  ${renderIdade()}`;
 }
+
+/* ===== IDADE DO DADO =====
+ *
+ * A pergunta que esta tela precisa responder antes de qualquer numero:
+ * "isso aqui e de agora ou de semana passada?"
+ *
+ * A fonte e `meta.lastSync` - o instante em que a extensao falou com o Mercos
+ * pela ultima vez. NAO e `geradoEm` da analise: aquele campo e a hora em que o
+ * servidor recalculou o cache e sobe todo dia mesmo com o PC do escritorio
+ * desligado. Foi exatamente essa confusao que deixou a tela parecer viva
+ * durante os nove dias de agosto em que nada sincronizou.
+ *
+ * Faixas: ate 2h e rotina; ate 24h e normal mas ja vale dizer a hora; passou
+ * de 24h vira ambar; passou de 72h vira vermelho piscando, porque a essa
+ * altura a causa quase sempre e uma so - o PC do escritorio esta desligado.
+ */
+function idadeDoDado() {
+  const m = state.meta || {};
+  const iso = m.lastSync || null;
+  if (!iso) return { nivel: 'alerta', texto: 'Nunca sincronizado com o Mercos.', quando: null };
+
+  const quando = new Date(iso);
+  if (isNaN(quando)) return { nivel: 'alerta', texto: 'Data do último sync ilegível.', quando: null };
+
+  const min = Math.max(0, Math.round((Date.now() - quando.getTime()) / 60000));
+  const horas = min / 60;
+
+  /* Hora local de Sao Paulo, sempre - nunca toISOString, que joga o dia para
+   * tras depois das 21h e faz "hoje" virar "ontem" na tela do Bruno. */
+  const hora = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit',
+  }).format(quando);
+  const dia = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit',
+  }).format(quando);
+
+  if (horas < 2) {
+    const q = min < 1 ? 'agora mesmo' : min < 60 ? `há ${min} min` : 'há 1 hora';
+    return { nivel: 'ok', texto: `Dados do Mercos <b>${q}</b> · ${hora}`, quando };
+  }
+  if (horas < 24) {
+    /* Menos de 24h nao quer dizer "hoje": as 3h da manha, um sync das 23h de
+     * ontem tem 4 horas de idade e ainda assim e de ontem. Comparar o dia do
+     * calendario em Sao Paulo, nunca so a diferenca em horas. */
+    const diaDe = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
+    const rotulo = diaDe(quando) === diaDe(new Date(Date.now())) ? 'hoje' : 'ontem';
+    return { nivel: 'ok', texto: `Dados do Mercos de <b>${rotulo}, ${hora}</b>`, quando };
+  }
+
+  const dias = Math.floor(horas / 24);
+  if (horas < 72) {
+    return {
+      nivel: 'atencao',
+      texto: `Dados de <b>${dia}, ${hora}</b> — ${dias} dia${dias > 1 ? 's' : ''} sem sincronizar. `
+        + 'Os números abaixo não incluem o que a Gisele lançou depois disso.',
+      quando,
+    };
+  }
+  return {
+    nivel: 'alerta',
+    texto: `<b>${dias} dias sem sincronizar</b> (último: ${dia}, ${hora}). `
+      + 'Não decida visita por esta tela. Quase sempre é o PC do escritório desligado.',
+    quando,
+  };
+}
+
+function renderIdade() {
+  const i = idadeDoDado();
+  return `<div class="idade-dado ${i.nivel}"><span class="pt"></span><span>${i.texto}</span></div>`;
+}
+
 
 /* ===== Perfis: alto padrão x médio padrão =====
  * Marcar fábrica por cliente seriam 240 x 23 = mais de 5 mil decisões. Aqui são
@@ -1194,10 +1284,24 @@ function ligar() {
   });
 }
 
+/* Le so o `meta` do dataset. O corpo vem junto porque a API nao tem endpoint
+ * leve para isso, mas nada alem do meta e guardado - o Vendas nao precisa da
+ * lista de clientes. Falhar aqui nao pode derrubar a tela: sem meta, o selo
+ * diz "nunca sincronizado", que ja e a informacao honesta. */
+async function carregarMeta() {
+  try {
+    const d = await apiFetch('/api/data');
+    state.meta = (d && d.meta) || null;
+  } catch (e) {
+    state.meta = null;
+  }
+}
+
 async function carregar() {
   // A malha nao bloqueia a tela: o mapa aparece com os pontos e o contorno
   // entra assim que chegar.
   carregarMalhas().then(() => { if (state.dados) render(); }).catch(() => {});
+  carregarMeta().then(() => { if (state.dados) render(); });
 
   state.erro = null; state.dados = null; render();
   try {
