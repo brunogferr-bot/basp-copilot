@@ -68,6 +68,16 @@
   .fab-linha .trilho i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold)}
   .fab-linha .trilho u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-soft);opacity:.75}
 
+  .rm{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+  .rm h4{margin:0 0 4px;font-size:15px}
+  .rm .lead{font-size:13.5px;line-height:1.65;color:var(--ink);margin-bottom:14px}
+  .rm .bloco{padding:12px 0;border-top:1px dashed var(--border)}
+  .rm .bt{font-size:13.5px;font-weight:700;margin-bottom:4px}
+  .rm .bx{font-size:13.5px;line-height:1.6;color:var(--ink)}
+  .rm .conta{margin-top:14px;padding:13px 14px;border:1px solid var(--gold);border-radius:10px;
+    background:rgba(210,175,120,.07);font-size:13.5px;line-height:1.65}
+  .rm b{font-weight:700}
+
   .acoes{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
   .acao{display:flex;gap:10px;padding:9px 0;font-size:13.5px;line-height:1.5}
   .acao .mk{flex:none;width:6px;height:6px;border-radius:50%;margin-top:7px;background:var(--gold)}
@@ -710,6 +720,233 @@ function acoesDoMes(m) {
   return A;
 }
 
+/* ===== RESUMO DO MES =====
+ *
+ * O mesmo texto que eu escrevia na conversa, agora gerado pela tela e refeito
+ * a cada leitura. Cada bloco nasce de uma comparacao entre numeros desta
+ * pagina - nenhuma frase e fixa.
+ *
+ * ATRIBUICAO HONESTA, a mesma regra do plano por fabrica: o que esta entre
+ * aspas e citacao real; o resto e o principio do autor resumido em uma linha.
+ * Nao invento frase de ninguem.
+ *
+ * O bloco de conquistas vem PRIMEIRO quando existe. Painel que so cobra vira
+ * painel que nao se abre.
+ */
+
+/* Dias uteis que ainda restam. O objetivo se espalha pelos 31 dias (decisao do
+ * Bruno: fim de semana represa e cai na segunda), mas na hora de planejar a
+ * agenda o que importa e quantos dias de trabalho sobraram de verdade. */
+function diasUteisRestantes(m) {
+  let n = 0;
+  for (let d = m.corridos + 1; d <= m.diasDoMes; d += 1) {
+    const dt = new Date(m.mes + '-' + String(d).padStart(2, '0') + 'T12:00:00Z');
+    const s = dt.getUTCDay();
+    if (s !== 0 && s !== 6) n += 1;
+  }
+  return n;
+}
+
+function renderResumo(m) {
+  const B = [];
+  const falta = Math.max(0, m.objetivoMes - m.acumulado);
+  const deficit = m.esperadoAte - m.acumulado;
+  const uteis = diasUteisRestantes(m);
+  const comMovimento = m.dias.slice(0, m.corridos).filter((d) => (d.valor || 0) > 0).length;
+  const semMovimento = m.corridos - comMovimento;
+  const porUtil = uteis ? falta / uteis : 0;
+
+  const linhas = m.linhas.filter((l) => l.alvo > 0);
+  const gaps = linhas.map((l) => ({ ...l, gap: Math.max(0, l.alvo - l.feito) }))
+    .sort((a, b) => b.gap - a.gap);
+
+  /* --- conquistas: o que ja foi batido --- */
+  const batidas = linhas.filter((l) => l.feito >= l.alvo);
+  const diasAcima = m.dias.slice(0, m.corridos).filter((d) => (d.valor || 0) >= m.objetivoDia).length;
+  const varAno = m.anoPassadoAte ? Math.round(((m.acumulado - m.anoPassadoAte) / m.anoPassadoAte) * 100) : null;
+
+  const conq = [];
+  if (batidas.length) {
+    conq.push(`<b>${batidas.length} fábrica${batidas.length > 1 ? 's' : ''} já bateu a meta do mês inteiro</b>: `
+      + batidas.map((l) => `${esc(l.nome)} (${fmtCurto(l.feito)} de ${fmtCurto(l.alvo)})`).join(' · ') + '.');
+  }
+  const quase = linhas.filter((l) => l.feito < l.alvo && l.feito >= l.alvo * 0.9);
+  if (quase.length) {
+    conq.push(`A menos de 10% da meta: ${quase.map((l) => `<b>${esc(l.nome)}</b> (falta ${fmtCurto(l.alvo - l.feito)})`).join(' · ')}.`);
+  }
+  if (diasAcima) {
+    conq.push(`<b>${diasAcima} de ${m.corridos} dias</b> fecharam acima do objetivo diário de ${fmtCurto(m.objetivoDia)}.`);
+  }
+  if (varAno != null && varAno > 0) {
+    conq.push(`Contra o mesmo trecho do ano passado: <b class="up">+${varAno}%</b> — ${fmtCurto(m.acumulado)} contra ${fmtCurto(m.anoPassadoAte)}.`);
+  }
+  if (m.acumulado >= m.objetivoMes) {
+    conq.unshift('<b>A meta do mês já foi batida.</b> O que entrar daqui pra frente sobe a régua dos próximos anos — esta média vira o objetivo deste mês no ano que vem.');
+  }
+
+  /* --- 1. onde o mes esta --- */
+  const lead = `Dia <b>${m.corridos} de ${m.diasDoMes}</b>, restam <b>${m.faltam} dias</b> (${uteis} úteis). `
+    + `Realizado <b>${fmtMoney(m.acumulado)}</b> de uma meta de <b>${fmtMoney(m.objetivoMes)}</b>`
+    + ` — ${Math.round((m.acumulado / (m.objetivoMes || 1)) * 100)}% do caminho. `
+    + (deficit > 0
+      ? `Está <b class="down">${fmtMoney(deficit)} abaixo</b> do esperado para esta altura do mês. `
+      : `Está <b class="up">${fmtMoney(-deficit)} acima</b> do esperado para esta altura do mês. `)
+    + `No ritmo de hoje o mês fecha em <b>${fmtMoney(m.tendencia)}</b>.`;
+
+  if (varAno != null && varAno > 0 && m.tendencia < m.objetivoMes) {
+    B.push({
+      t: 'Dois números que parecem se contradizer',
+      x: `Você está <b class="up">+${varAno}%</b> sobre o ano passado e <b class="down">${Math.round((1 - m.tendencia / m.objetivoMes) * 100)}% abaixo</b> da média de ${m.anos.length} anos. `
+        + `Não é contradição: ${Math.min(...m.anos)}–${Math.max(...m.anos)} inclui anos melhores que o último. `
+        + 'Crescer sobre o ano mais fraco não significa ter voltado ao normal.',
+      autor: 'Jack Welch', frase: '"Encare a realidade como ela é, não como você gostaria que fosse."',
+      ctx: 'GE. Diagnóstico honesto antes do plano de ação.',
+    });
+  }
+
+  /* --- 2. ritmo x cobertura --- */
+  if (semMovimento && comMovimento) {
+    B.push({
+      t: `${semMovimento} de ${m.corridos} dias sem nenhum lançamento`,
+      x: `Os ${fmtMoney(m.acumulado)} saíram de <b>${comMovimento} dias</b> com movimento — `
+        + `${fmtMoney(m.acumulado / comMovimento)} por dia trabalhado. `
+        + `Para fechar a meta faltam ${fmtMoney(falta)} em <b>${uteis} dias úteis</b>, ou ${fmtMoney(porUtil)} por dia. `
+        + (porUtil <= (m.acumulado / comMovimento) * 1.1
+          ? 'O ritmo por dia trabalhado já está no ponto — o que falta é ocupar os dias vazios.'
+          : 'Além de ocupar os dias vazios, cada dia precisa render mais do que vem rendendo.'),
+      autor: 'John H. Patterson', frase: null,
+      ctx: 'NCR: vender é gestão de praça — território, cota e roteiro, não sorte.',
+    });
+  }
+
+  /* --- 3. concentracao --- */
+  const ord = m.linhas.slice().sort((a, b) => b.feito - a.feito).filter((l) => l.feito > 0);
+  const top = ord.slice(0, 4);
+  const somaTop = top.reduce((s, l) => s + l.feito, 0);
+  const pctTop = m.acumulado ? Math.round((somaTop / m.acumulado) * 100) : 0;
+  if (pctTop >= 65 && top.length) {
+    const esgotadas = top.filter((l) => l.alvo && l.feito >= l.alvo * 0.95);
+    B.push({
+      t: `${top.length} fábricas respondem por ${pctTop}% do mês`,
+      x: `${top.map((l) => `${esc(l.nome)} (${fmtCurto(l.feito)})`).join(', ')}. `
+        + 'Se uma delas travar na segunda quinzena não há reserva para compensar. '
+        + (esgotadas.length
+          ? `E ${esgotadas.map((e) => esc(e.nome)).join(', ')} já está praticamente no teto da própria média — não tem de onde crescer neste mês.`
+          : 'Vale confirmar pedido em carteira antes de contar com elas.'),
+      autor: 'Aaron Ross', frase: null,
+      ctx: 'Predictable Revenue: receita previsível vem de processo de entrada, não de poucas fontes grandes.',
+    });
+  }
+
+  /* --- 4. o maior buraco isolado --- */
+  const maior = gaps[0];
+  if (maior && maior.gap > 0 && maior.feito < maior.alvo * 0.4) {
+    B.push({
+      t: `${esc(maior.nome)} é o maior buraco isolado: ${fmtMoney(maior.gap)}`,
+      x: `Média histórica de ${fmtMoney(maior.alvo)} neste mês e apenas ${fmtMoney(maior.feito)} até agora `
+        + `(${Math.round((maior.feito / maior.alvo) * 100)}%). Isso não é oscilação, é ausência. `
+        + 'Antes de atribuir a mercado ou preço, abra esta fábrica no módulo e veja <b>quais lojas</b> '
+        + 'compravam neste mês e não compraram. A perda é rastreável loja a loja; o resto é hipótese.',
+      autor: 'Jack Welch', frase: null,
+      ctx: 'Diagnóstico antes de explicação.',
+    });
+  }
+
+  /* --- 5. zeradas com historico --- */
+  const zeradas = gaps.filter((g) => g.feito === 0);
+  if (zeradas.length) {
+    const soma = zeradas.reduce((s, z) => s + z.alvo, 0);
+    B.push({
+      t: `${zeradas.length} fábrica${zeradas.length > 1 ? 's' : ''} sem um único pedido, todas com histórico`,
+      x: `${zeradas.map((z) => `${esc(z.nome)} (${fmtCurto(z.alvo)})`).join(' · ')} — ${fmtMoney(soma)} de média somada. `
+        + `Só ${esc(zeradas[0].nome)} vale ${fmtMoney(zeradas[0].alvo)}. `
+        + 'Reativar quem já comprou custa menos que qualquer prospecção nova, e é a maior alavanca disponível na segunda quinzena.',
+      autor: 'Marcelo Caetano', frase: null,
+      ctx: 'Gestão de carteira: crescer dentro da carteira que já se tem é o caminho mais barato.',
+    });
+  }
+
+  /* --- 6. presentes mas fracas --- */
+  /* O maior buraco ja tem bloco proprio - repetir aqui so dilui. */
+  const fracas = gaps.filter((g) => g.feito > 0 && g.feito < g.alvo * 0.2
+    && !(maior && g.nome === maior.nome));
+  if (fracas.length) {
+    B.push({
+      t: `${fracas.length} fábrica${fracas.length > 1 ? 's' : ''} com movimento, mas abaixo de 20% da meta`,
+      x: `${fracas.map((f) => `<b>${esc(f.nome)}</b> (${Math.round((f.feito / f.alvo) * 100)}%)`).join(' · ')}. `
+        + 'Pior sinal que zero: houve contato e o volume não veio. Queda sem parada costuma ser troca de '
+        + 'fornecedor em silêncio. Não pergunte se está tudo bem — pergunte o que mudou no mix da loja.',
+      autor: 'Neil Rackham', frase: null,
+      ctx: 'SPIN Selling: em venda complexa, pergunta de implicação abre mais que argumento.',
+    });
+  }
+
+  /* --- 7. as que estao no ritmo ---
+   * "No ritmo" e quem esta no passo do calendario. Quem ja passou de 90% da
+   * media do mes inteiro nao esta no ritmo - esta adiantada, e aparece nas
+   * conquistas. Misturar as duas coisas esconde as duas. */
+  const proporcao = m.corridos / m.diasDoMes;
+  const noRitmo = linhas.filter((l) => l.feito >= l.alvo * proporcao && l.feito < l.alvo * 0.9);
+  if (noRitmo.length >= 2) {
+    B.push({
+      t: `${noRitmo.length} fábricas exatamente no ritmo do mês`,
+      x: `${noRitmo.map((l) => `${esc(l.nome)} (${Math.round((l.feito / l.alvo) * 100)}%)`).join(' · ')}. `
+        + 'Estão onde deveriam estar no dia ' + m.corridos + '. Vale entender <b>por que</b> essas estão no ritmo '
+        + 'e as outras não — a resposta costuma ser frequência de visita, não produto.',
+      autor: 'Raul Candeloro', frase: null,
+      ctx: 'Gestão por indicadores: medir para descobrir o que repetir.',
+    });
+  }
+
+  /* --- 8. a tentacao do desconto --- */
+  if (falta > 0 && m.tendencia < m.objetivoMes * 0.95) {
+    B.push({
+      t: 'Sobre a pressão de fechar o mês',
+      x: `Faltando ${fmtMoney(falta)}, a saída curta é preço. Desconto para bater o mês rebaixa a base do mês `
+        + 'seguinte e contamina a média dos próximos anos — inclusive esta régua, que é feita da sua própria história.',
+      autor: 'Thiago Concer', frase: null,
+      ctx: 'Desconto é a saída de quem não construiu valor antes.',
+    });
+  }
+
+  /* --- a conta que fecha --- */
+  let conta = '';
+  if (falta > 0) {
+    const acum = [];
+    let soma = 0;
+    for (const g of gaps) {
+      if (soma >= falta * 0.6 || acum.length >= 4) break;
+      acum.push(g); soma += g.gap;
+    }
+    conta = `<b>A conta que fecha o mês.</b> Faltam ${fmtMoney(falta)} em ${m.faltam} dias `
+      + `(${fmtMoney(m.faltam ? falta / m.faltam : 0)} por dia corrido, ${fmtMoney(porUtil)} por dia útil). `
+      + (acum.length
+        ? `Se ${acum.map((a) => esc(a.nome)).join(', ')} voltarem à média histórica, sozinhas trazem `
+          + `<b>${fmtMoney(soma)}</b> — ${Math.round((soma / falta) * 100)}% do que falta. `
+          + 'O mês não se resolve empurrando quem já vai bem: ele se resolve em '
+          + `${acum.length} nome${acum.length > 1 ? 's' : ''}.`
+        : '');
+  } else {
+    conta = `<b>Meta do mês alcançada.</b> ${fmtMoney(m.acumulado)} contra ${fmtMoney(m.objetivoMes)} de objetivo, `
+      + `com ${m.faltam} dia(s) ainda pela frente.`;
+  }
+
+  return `<div class="rm">
+    <h4>Resumo do mês</h4>
+    <div class="lead">${lead}</div>
+    ${conq.length ? `<div class="bloco"><div class="bt up">✔ O que já foi conquistado</div>
+      <div class="bx">${conq.map((c) => `• ${c}`).join('<br>')}</div></div>` : ''}
+    ${B.map((b) => `<div class="bloco">
+      <div class="bt">${b.t}</div>
+      <div class="bx">${b.x}</div>
+      <div class="pensador"><b>${esc(b.autor)}</b>${b.frase ? ' — ' + esc(b.frase) : ''}${b.ctx ? ' · ' + esc(b.ctx) : ''}</div>
+    </div>`).join('')}
+    <div class="conta">${conta}</div>
+    <div class="nota">Refeito a cada abertura da tela, com os números do momento.
+      Entre aspas é citação; o resto é o princípio do autor resumido.</div>
+  </div>`;
+}
+
 function renderMes() {
   const m = calcMes();
   if (!m) {
@@ -730,8 +967,9 @@ function renderMes() {
     const pf = Math.min(100, (l.feito / teto) * 100);
     const pa = Math.min(100, (l.alvo / teto) * 100);
     const razao = l.alvo ? Math.round((l.feito / l.alvo) * 100) : null;
+    const bateu = l.alvo > 0 && l.feito >= l.alvo;
     return `<div class="fab-linha">
-      <div class="nome">${esc(l.nome)}</div>
+      <div class="nome">${bateu ? '<span class="up">✔</span> ' : ''}${esc(l.nome)}</div>
       <div class="num">${fmtCurto(l.feito)}${l.alvo ? ` <span class="neutro">de ${fmtCurto(l.alvo)}</span>` : ' <span class="neutro">sem alvo</span>'}${razao != null ? ` · <span class="${razao >= 100 ? 'up' : razao >= 60 ? 'neutro' : 'down'}">${razao}%</span>` : ''}</div>
       <div class="trilho"><i style="width:${pf}%"></i>${l.alvo ? `<u style="left:${pa}%"></u>` : ''}</div>
     </div>`;
@@ -770,9 +1008,7 @@ function renderMes() {
     <div class="rot" style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px">Fábrica a fábrica neste mês</div>
     ${fabs}
 
-    <div class="acoes">
-      ${acoesDoMes(m).map((a) => `<div class="acao"><span class="mk"></span><span>${a}</span></div>`).join('')}
-    </div>
+    ${renderResumo(m)}
   </div>`;
 }
 
