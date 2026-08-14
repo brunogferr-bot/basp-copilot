@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BASP · Jurídico</title>
+<link rel="stylesheet" href="basp-tema.css">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1712;--ink-soft:#6b6258;--border:#e7e0d6;--gold:#a8853a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+  #app{max-width:1000px;margin:0 auto;padding:18px 18px 90px}
+  a{color:inherit}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .brand{font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .brand small{display:block;font-size:12px;font-weight:500;color:var(--ink-soft)}
+  .btn{border:1px solid var(--border);background:var(--card);color:var(--ink);
+    padding:8px 13px;border-radius:8px;font-size:13.5px;cursor:pointer;font-family:inherit;text-decoration:none;
+    display:inline-block}
+  .btn:hover{border-color:var(--gold)}
+  .btn-sm{padding:5px 10px;font-size:12.5px}
+  .nota{font-size:12px;color:var(--ink-soft);margin-top:8px}
+  .up{color:#3fa66a}.down{color:#c05c52}.neutro{color:var(--ink-soft)}
+
+  /* ===== AVISO DE ESTIMATIVA =====
+   * Bruno, 14/08/2026: "deixe uma informacao de que a base de calculo nao e
+   * real, e uma estimativa baseada em faturamento, que e necessario validar
+   * com o informe de rendimentos".
+   * A tarja fica no topo e cada bloco repete a ressalva. Numero de dinheiro
+   * sem etiqueta vira verdade na cabeca de quem le. */
+  .tarja{margin:14px 0 0;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.55;
+    border:1px solid #c99a3e;background:rgba(201,154,62,.12)}
+  .tarja b{font-weight:700}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:16px 0}
+  .kpi{padding:12px 13px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+  .kpi .rot{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  .kpi .val{font-size:22px;font-weight:700;margin:5px 0 3px;letter-spacing:-.02em}
+  .kpi .pe{font-size:12px;color:var(--ink-soft);line-height:1.45}
+
+  h3{margin:26px 0 4px;font-size:16px}
+  .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;line-height:1.55}
+
+  .fab{border:1px solid var(--border);border-radius:11px;background:var(--card);padding:14px;margin-bottom:10px}
+  .fab .cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .fab .nome{font-size:15px;font-weight:700}
+  .fab .pct{font-size:12.5px;color:var(--ink-soft)}
+  .fab .grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}
+  .fab .cel{padding:8px 10px;border:1px solid var(--border);border-radius:8px}
+  .fab .cel .r{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+  .fab .cel .v{font-size:15px;font-weight:700;margin-top:2px}
+  .flags{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap}
+  .flag{font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid var(--border);color:var(--ink-soft)}
+  .flag.alerta{border-color:#c99a3e;color:#8a6a1f;background:rgba(201,154,62,.10)}
+
+  .spark{display:flex;align-items:flex-end;gap:2px;height:34px;margin-top:10px}
+  .spark i{flex:1;background:var(--gold);opacity:.55;border-radius:1px;min-height:1px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{text-align:right;padding:7px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .rolagem{overflow-x:auto}
+
+  .anexo{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--ink-soft)}
+  .vazio{padding:28px;text-align:center;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div id="app">Carregando…</div>
+
+<script>
+/* =====================================================================
+ * BASP COPILOT - MODULO JURIDICO
+ *
+ * O que esta tela responde:
+ *   1. quanto de comissao cada fabrica gerou, mes a mes;
+ *   2. quanto seria o acerto se aquela fabrica desligasse a BASP hoje;
+ *   3. o que no cadastro da fabrica destoa da Lei 4.886/65.
+ *
+ * A LEI QUE SUSTENTA CADA NUMERO
+ *   art. 27, "j"    - indenizacao nao inferior a 1/12 do TOTAL da retribuicao
+ *                     auferida durante todo o tempo da representacao. Nao e
+ *                     1/12 do ultimo ano: e de tudo.
+ *   art. 34         - aviso previo de 30 dias OU 1/3 das comissoes dos tres
+ *                     meses anteriores, em contrato por prazo indeterminado
+ *                     que ja tenha vigorado mais de seis meses.
+ *   art. 32, par.4o - comissao calculada sobre o valor TOTAL das mercadorias.
+ *   art. 32, par.7o - vedadas alteracoes que reduzam a media dos seis meses.
+ *   art. 44 par.un. - prescreve em cinco anos.
+ *
+ * O QUE ESTA TELA NAO E
+ *   Nao e calculo de comissao real. O Mercos entrega FATURAMENTO; a comissao
+ *   aqui e faturamento x percentual do cadastro. A comissao real depende de
+ *   base liquida, devolucao, cancelamento e do que cada fabrica de fato
+ *   pagou - isso so aparece no informe de rendimentos. Enquanto o informe
+ *   nao for anexado, todo numero desta tela e ESTIMATIVA, e a tela diz isso.
+ *
+ *   Tambem nao e parecer juridico. Ela aponta o artigo; quem interpreta e
+ *   advogado.
+ * ===================================================================== */
+
+const DEFAULT_API_BASE = 'https://basp-rotas-api.onrender.com';
+const API_BASE_KEY = 'basp_rotas_api_base_v1';
+const API_TOKEN_KEY = 'basp_rotas_api_token_v1';
+const ANEXOS_KEY = 'basp_juridico_anexos_v1';
+
+function getApiBase() { return localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE; }
+function getApiToken() { return (localStorage.getItem(API_TOKEN_KEY) || '').trim(); }
+
+async function apiFetch(path) {
+  const res = await fetch(getApiBase().replace(/\/$/, '') + path, {
+    headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+  });
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  if (!res.ok) throw new Error((body && body.error) || ('Erro ' + res.status + ' ao falar com o servidor.'));
+  return body;
+}
+
+const state = { jur: null, erro: null, ativas: null };
+
+const fmt = (n) => (n == null ? '--' :
+  'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const curto = (n) => {
+  if (n == null) return '--';
+  const v = Number(n);
+  if (Math.abs(v) >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi';
+  if (Math.abs(v) >= 1e3) return 'R$ ' + (v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' mil';
+  return fmt(v);
+};
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* Anexos ficam no proprio aparelho por enquanto: guardar contrato e informe
+ * de rendimentos no servidor exige tratamento de documento e consentimento
+ * que ainda nao foi decidido. O campo registra que o documento existe, a data
+ * real de inicio e onde ele esta - o arquivo em si fica onde ja esta hoje. */
+function lerAnexos() {
+  try { return JSON.parse(localStorage.getItem(ANEXOS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function salvarAnexos(a) {
+  try { localStorage.setItem(ANEXOS_KEY, JSON.stringify(a)); } catch (e) {}
+}
+
+const mesesOrdenados = (obj) => Object.keys(obj || {}).sort();
+
+function calcular() {
+  const j = state.jur;
+  if (!j || j.vazio || !j.cadastro) return null;
+
+  const pct = {};
+  const meta = {};
+  (j.cadastro || []).forEach((c) => {
+    if (!c.nome) return;
+    pct[c.nome] = c.pct;
+    meta[c.nome] = c;
+  });
+
+  /* A BASP aparece no cadastro do Mercos como se fosse representada (44%).
+   * E a propria empresa, nao uma fabrica - fica de fora de tudo. */
+  const ehFabrica = (nome) => nome && nome.toUpperCase() !== 'BASP';
+
+  const nomes = [...new Set([
+    ...Object.keys(j.total || {}),
+    ...Object.keys(j.mensal || {}),
+  ])].filter(ehFabrica);
+
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const mesAtual = hoje.slice(0, 7);
+
+  const linhas = nomes.map((nome) => {
+    const p = pct[nome];
+    const m = meta[nome] || {};
+    const serie = j.mensal[nome] || {};
+    const anos = j.anual[nome] || {};
+    const totalFat = (j.total || {})[nome] || 0;
+
+    const temPct = typeof p === 'number' && p > 0;
+    const com = (v) => (temPct ? v * (p / 100) : null);
+
+    /* art. 27, "j": 1/12 sobre o total auferido em toda a representacao */
+    const totalCom = com(totalFat);
+    const umDoze = totalCom == null ? null : totalCom / 12;
+
+    /* art. 34: 1/3 das comissoes dos TRES MESES ANTERIORES. Anteriores, sem o
+     * corrente, que ainda esta aberto e puxaria a conta para baixo no dia 3. */
+    const ms = mesesOrdenados(serie).filter((k) => k < mesAtual).slice(-3);
+    const fat3 = ms.reduce((s, k) => s + (serie[k] || 0), 0);
+    const com3 = com(fat3);
+    const aviso = com3 == null ? null : com3 / 3;
+
+    const acerto = (umDoze == null || aviso == null) ? null : umDoze + aviso;
+
+    const anosComVenda = Object.keys(anos).filter((a) => anos[a] > 0).sort();
+    const primeiroAno = anosComVenda.length ? anosComVenda[0] : null;
+
+    const doze = mesesOrdenados(serie).slice(-12);
+    const fat12 = doze.reduce((s, k) => s + (serie[k] || 0), 0);
+
+    /* art. 32, par.7o: media dos ultimos seis meses contra os seis anteriores */
+    const todos = mesesOrdenados(serie);
+    const u6 = todos.slice(-6).reduce((s, k) => s + (serie[k] || 0), 0) / 6;
+    const a6 = todos.slice(-12, -6).reduce((s, k) => s + (serie[k] || 0), 0) / 6;
+    const varMedia = a6 > 0 ? (u6 - a6) / a6 : null;
+
+    return {
+      nome, pct: p, meta: m, serie, anos, primeiroAno,
+      totalFat, totalCom, umDoze, aviso, acerto, fat12, com12: com(fat12),
+      varMedia, mesesSerie: todos,
+    };
+  }).filter((l) => l.totalFat > 0);
+
+  linhas.sort((a, b) => (b.acerto || 0) - (a.acerto || 0));
+
+  const ativas = new Set(state.ativas || []);
+  const somaAcerto = linhas
+    .filter((l) => !ativas.size || ativas.has(l.nome))
+    .reduce((s, l) => s + (l.acerto || 0), 0);
+
+  return {
+    linhas,
+    somaAcerto,
+    totalComissaoHistorica: linhas.reduce((s, l) => s + (l.totalCom || 0), 0),
+    comissao12: linhas.reduce((s, l) => s + (l.com12 || 0), 0),
+    descontamST: linhas.filter((l) => l.meta.descontaST).length,
+    descontamIPI: linhas.filter((l) => l.meta.descontaIPI).length,
+    atualizadoEm: j.atualizadoEm || null,
+  };
+}
