@@ -182,21 +182,40 @@ function calcular() {
     const temPct = typeof p === 'number' && p > 0;
     const com = (v) => (temPct ? v * (p / 100) : null);
 
-    /* art. 27, "j": 1/12 sobre o total auferido em toda a representacao */
-    const totalCom = com(totalFat);
+    /* COMISSAO REGISTRADA vs ESTIMADA.
+     * A varredura de pedidos traz valor_total_comissao - a comissao que o
+     * proprio Mercos calculou, ja com o criterio da representada (inclusive
+     * o desconto de IPI e ST, quando ela desconta). Isso vale mais que
+     * faturamento x percentual, entao e a fonte preferida.
+     * A estimativa fica como reserva, para fabrica sem comissao registrada.
+     * A DIFERENCA entre as duas e informacao juridica: e onde aparece, em
+     * reais, o efeito de descontar imposto da base que o art. 32, par. 4o
+     * discute. */
+    const comRegistrada = (j.comissaoTotal || {})[nome];
+    const temReg = typeof comRegistrada === 'number' && comRegistrada > 0;
+    const comSerie = (j.comissaoMensal || {})[nome] || null;
+
+    const totalCom = temReg ? comRegistrada : com(totalFat);
+    const totalComEstimado = com(totalFat);
+    const difBase = (temReg && totalComEstimado != null) ? totalComEstimado - comRegistrada : null;
     const umDoze = totalCom == null ? null : totalCom / 12;
 
     /* art. 34: 1/3 das comissoes dos TRES MESES ANTERIORES. Anteriores, sem o
      * corrente, que ainda esta aberto e puxaria a conta para baixo no dia 3. */
     const ms = mesesOrdenados(serie).filter((k) => k < mesAtual).slice(-3);
     const fat3 = ms.reduce((s, k) => s + (serie[k] || 0), 0);
-    const com3 = com(fat3);
+    const com3 = (comSerie && temReg)
+      ? ms.reduce((s, k) => s + (comSerie[k] || 0), 0)
+      : com(fat3);
     const aviso = com3 == null ? null : com3 / 3;
 
     const acerto = (umDoze == null || aviso == null) ? null : umDoze + aviso;
 
     const anosComVenda = Object.keys(anos).filter((a) => anos[a] > 0).sort();
-    const primeiroAno = anosComVenda.length ? anosComVenda[0] : null;
+    /* A varredura de pedidos da a data exata do primeiro pedido, nao so o ano. */
+    const primeiraData = (j.primeira || {})[nome] || null;
+    const primeiroAno = primeiraData ? primeiraData.slice(0, 4)
+      : (anosComVenda.length ? anosComVenda[0] : null);
 
     const doze = mesesOrdenados(serie).slice(-12);
     const fat12 = doze.reduce((s, k) => s + (serie[k] || 0), 0);
@@ -208,8 +227,11 @@ function calcular() {
     const varMedia = a6 > 0 ? (u6 - a6) / a6 : null;
 
     return {
-      nome, pct: p, meta: m, serie, anos, primeiroAno,
-      totalFat, totalCom, umDoze, aviso, acerto, fat12, com12: com(fat12),
+      nome, pct: p, meta: m, serie, anos, primeiroAno, primeiraData,
+      totalFat, totalCom, umDoze, aviso, acerto, fat12,
+      com12: (comSerie && temReg) ? doze.reduce((s2, k) => s2 + (comSerie[k] || 0), 0) : com(fat12),
+      registrada: temReg, difBase, impostos: (j.impostos || {})[nome] || 0,
+      pedidos: (j.pedidos || {})[nome] || 0,
       varMedia, mesesSerie: todos,
     };
   }).filter((l) => l.totalFat > 0);
@@ -251,13 +273,20 @@ function renderFabrica(l, anexos) {
   if (l.varMedia != null && l.varMedia <= -0.15) {
     flags.push(`<span class="flag alerta">média caiu ${Math.round(l.varMedia * 100)}% em 6 meses</span>`);
   }
+  if (!l.registrada) flags.push('<span class="flag">comissão estimada, sem registro no Mercos</span>');
+  /* A diferenca entre o percentual cheio e a comissao registrada e, em reais,
+   * o efeito de tirar imposto da base - o assunto do art. 32, par. 4o. */
+  if (l.difBase != null && l.difBase > 1000) {
+    flags.push(`<span class="flag alerta">${curto(l.difBase)} a menos que ${l.pct}% cheio</span>`);
+  }
 
   return `<div class="fab">
     <div class="cab">
       <div>
         <div class="nome">${esc(l.nome)}</div>
         <div class="pct">${l.pct != null ? l.pct.toFixed(2).replace('.', ',') + '% de comissão' : 'percentual não cadastrado'}
-          · desde ${a.inicio ? esc(a.inicio) + ' (contrato)' : (l.primeiroAno ? l.primeiroAno + ' (1º pedido)' : '--')}</div>
+          · desde ${a.inicio ? esc(a.inicio) + ' (contrato)' : (l.primeiraData ? l.primeiraData.split('-').reverse().join('/') + ' (1º pedido)' : (l.primeiroAno ? l.primeiroAno + ' (1º pedido)' : '--'))}
+          ${l.pedidos ? '· ' + l.pedidos + ' pedidos' : ''}</div>
       </div>
       <div style="text-align:right">
         <div class="pct">acerto estimado</div>
@@ -267,7 +296,7 @@ function renderFabrica(l, anexos) {
 
     <div class="grade">
       <div class="cel"><div class="r">Faturamento total</div><div class="v">${curto(l.totalFat)}</div></div>
-      <div class="cel"><div class="r">Comissão estimada</div><div class="v">${curto(l.totalCom)}</div></div>
+      <div class="cel"><div class="r">${l.registrada ? 'Comissão registrada' : 'Comissão estimada'}</div><div class="v">${curto(l.totalCom)}</div></div>
       <div class="cel"><div class="r">1/12 · art. 27 j</div><div class="v">${curto(l.umDoze)}</div></div>
       <div class="cel"><div class="r">Aviso prévio · art. 34</div><div class="v">${curto(l.aviso)}</div></div>
     </div>
@@ -313,11 +342,13 @@ function render() {
 
   app.innerHTML = topo + `
   <div class="tarja">
-    <b>Estes números são estimativa, não são a comissão real.</b> O Mercos entrega faturamento;
-    o que você vê aqui é faturamento multiplicado pelo percentual cadastrado de cada fábrica.
-    A comissão efetivamente paga depende de base líquida, devolução, cancelamento e do critério
-    de cada representada — e só aparece no <b>informe de rendimentos</b>.
-    Enquanto o informe não for anexado e confrontado, nada aqui serve para cobrança.
+    <b>Comissão registrada no Mercos, ainda não confrontada com o informe de rendimentos.</b>
+    Cada pedido traz a comissão já calculada pela própria representada — inclusive com o desconto
+    de IPI e ST, quando ela desconta. Isso vale mais que faturamento × percentual, mas continua
+    sendo <b>o que a fábrica registra que deve</b>, não o que ela comprovadamente pagou.
+    A conferência final é o informe de rendimentos. Até lá, nada aqui serve para cobrança.
+    Onde a linha aparecer como <i>estimada</i>, é porque não havia comissão registrada e a conta
+    voltou a ser faturamento × percentual.
   </div>
 
   <div class="cards">
