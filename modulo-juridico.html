@@ -231,6 +231,7 @@ function calcular() {
       totalFat, totalCom, umDoze, aviso, acerto, fat12,
       com12: (comSerie && temReg) ? doze.reduce((s2, k) => s2 + (comSerie[k] || 0), 0) : com(fat12),
       registrada: temReg, difBase, impostos: (j.impostos || {})[nome] || 0,
+      taxaEfetiva: (temReg && totalFat > 0) ? (comRegistrada / totalFat) * 100 : null,
       pedidos: (j.pedidos || {})[nome] || 0,
       varMedia, mesesSerie: todos,
     };
@@ -274,10 +275,17 @@ function renderFabrica(l, anexos) {
     flags.push(`<span class="flag alerta">média caiu ${Math.round(l.varMedia * 100)}% em 6 meses</span>`);
   }
   if (!l.registrada) flags.push('<span class="flag">comissão estimada, sem registro no Mercos</span>');
-  /* A diferenca entre o percentual cheio e a comissao registrada e, em reais,
-   * o efeito de tirar imposto da base - o assunto do art. 32, par. 4o. */
-  if (l.difBase != null && l.difBase > 1000) {
-    flags.push(`<span class="flag alerta">${curto(l.difBase)} a menos que ${l.pct}% cheio</span>`);
+  /* TAXA EFETIVA, e nao "diferenca de base".
+   * Conferido em 14/08/2026: valor_total_comissao do Mercos e exatamente
+   * faturamento x percentual do cadastro - Ferrari deu 5,99%, Greice 4,00%,
+   * Via Star 4,97%. Ou seja, esse campo NAO reflete o desconto de IPI e ST;
+   * o desconto acontece fora do Mercos, no que a fabrica de fato paga.
+   * Anunciar a diferenca como "efeito do imposto" seria mentira - o que ela
+   * mostra, quando aparece, e que o percentual mudou ao longo do tempo. */
+  if (l.taxaEfetiva != null) {
+    const alvo = l.pct;
+    const longe = alvo != null && l.taxaEfetiva < alvo * 0.97;
+    flags.push(`<span class="flag ${longe ? 'alerta' : ''}">taxa efetiva ${l.taxaEfetiva.toFixed(2).replace('.', ',')}%${longe ? ' · cadastro diz ' + alvo + '%' : ''}</span>`);
   }
 
   return `<div class="fab">
@@ -342,13 +350,14 @@ function render() {
 
   app.innerHTML = topo + `
   <div class="tarja">
-    <b>Comissão registrada no Mercos, ainda não confrontada com o informe de rendimentos.</b>
-    Cada pedido traz a comissão já calculada pela própria representada — inclusive com o desconto
-    de IPI e ST, quando ela desconta. Isso vale mais que faturamento × percentual, mas continua
-    sendo <b>o que a fábrica registra que deve</b>, não o que ela comprovadamente pagou.
-    A conferência final é o informe de rendimentos. Até lá, nada aqui serve para cobrança.
-    Onde a linha aparecer como <i>estimada</i>, é porque não havia comissão registrada e a conta
-    voltou a ser faturamento × percentual.
+    <b>Comissão do Mercos, ainda não confrontada com o informe de rendimentos.</b>
+    Cada pedido traz o campo de comissão do sistema — que, conferido pedido a pedido, é
+    simplesmente <b>faturamento × percentual do cadastro na época</b>. Ele tem a vantagem de usar
+    o percentual histórico correto, e não o de hoje. Mas atenção ao que ele <b>não</b> faz:
+    <b>não desconta IPI nem ST</b>, embora 16 fábricas descontem esses impostos na hora de pagar.
+    Então o valor real recebido tende a ser <b>menor</b> do que o mostrado aqui — e essa diferença
+    é justamente o assunto do art. 32, § 4º. Só o informe de rendimentos fecha a conta.
+    Nada nesta tela serve para cobrança antes disso.
   </div>
 
   <div class="cards">
