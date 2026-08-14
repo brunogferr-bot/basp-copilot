@@ -231,3 +231,182 @@ function calcular() {
     atualizadoEm: j.atualizadoEm || null,
   };
 }
+
+function renderSpark(l) {
+  const ms = l.mesesSerie.slice(-24);
+  if (!ms.length) return '';
+  const teto = Math.max(...ms.map((k) => l.serie[k] || 0), 1);
+  return '<div class="spark">' + ms.map((k) => {
+    const h = Math.round(((l.serie[k] || 0) / teto) * 100);
+    return `<i style="height:${Math.max(1, h)}%" title="${k}"></i>`;
+  }).join('') + '</div>';
+}
+
+function renderFabrica(l, anexos) {
+  const a = anexos[l.nome] || {};
+  const flags = [];
+  if (l.meta.descontaST) flags.push('<span class="flag alerta">desconta ST da base</span>');
+  if (l.meta.descontaIPI) flags.push('<span class="flag alerta">desconta IPI da base</span>');
+  if (l.meta.parcelaUnica) flags.push('<span class="flag">paga em parcela única</span>');
+  if (l.varMedia != null && l.varMedia <= -0.15) {
+    flags.push(`<span class="flag alerta">média caiu ${Math.round(l.varMedia * 100)}% em 6 meses</span>`);
+  }
+
+  return `<div class="fab">
+    <div class="cab">
+      <div>
+        <div class="nome">${esc(l.nome)}</div>
+        <div class="pct">${l.pct != null ? l.pct.toFixed(2).replace('.', ',') + '% de comissão' : 'percentual não cadastrado'}
+          · desde ${a.inicio ? esc(a.inicio) + ' (contrato)' : (l.primeiroAno ? l.primeiroAno + ' (1º pedido)' : '--')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="pct">acerto estimado</div>
+        <div class="nome">${curto(l.acerto)}</div>
+      </div>
+    </div>
+
+    <div class="grade">
+      <div class="cel"><div class="r">Faturamento total</div><div class="v">${curto(l.totalFat)}</div></div>
+      <div class="cel"><div class="r">Comissão estimada</div><div class="v">${curto(l.totalCom)}</div></div>
+      <div class="cel"><div class="r">1/12 · art. 27 j</div><div class="v">${curto(l.umDoze)}</div></div>
+      <div class="cel"><div class="r">Aviso prévio · art. 34</div><div class="v">${curto(l.aviso)}</div></div>
+    </div>
+
+    ${renderSpark(l)}
+    ${flags.length ? `<div class="flags">${flags.join('')}</div>` : ''}
+
+    <div class="anexo">
+      Contrato: <b>${a.contrato ? esc(a.contrato) : 'não anexado'}</b>
+      · Informe de rendimentos: <b>${a.informe ? esc(a.informe) : 'não anexado'}</b>
+      <button class="btn btn-sm" data-anexo="${esc(l.nome)}" style="margin-left:8px">Registrar documento</button>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const app = document.getElementById('app');
+
+  const topo = `<div class="topbar">
+    <div class="brand">BASP Copilot<small>Jurídico</small></div>
+    <div>
+      <a class="btn btn-sm" href="./index.html">← Módulos</a>
+      <button class="btn btn-sm" id="btn-recarregar">⟳ Atualizar</button>
+    </div>
+  </div>`;
+
+  if (state.erro) {
+    app.innerHTML = topo + `<div class="vazio">${esc(state.erro)}</div>`;
+    ligar();
+    return;
+  }
+  if (!state.jur) { app.innerHTML = topo + '<div class="vazio">Carregando…</div>'; return; }
+
+  const c = calcular();
+  if (!c || !c.linhas.length) {
+    app.innerHTML = topo + `<div class="vazio">Ainda não chegaram os dados jurídicos do Mercos.
+      Eles entram na primeira sincronização do dia — se demorar, a extensão do Chrome está parada.</div>`;
+    ligar();
+    return;
+  }
+
+  const anexos = lerAnexos();
+
+  app.innerHTML = topo + `
+  <div class="tarja">
+    <b>Estes números são estimativa, não são a comissão real.</b> O Mercos entrega faturamento;
+    o que você vê aqui é faturamento multiplicado pelo percentual cadastrado de cada fábrica.
+    A comissão efetivamente paga depende de base líquida, devolução, cancelamento e do critério
+    de cada representada — e só aparece no <b>informe de rendimentos</b>.
+    Enquanto o informe não for anexado e confrontado, nada aqui serve para cobrança.
+  </div>
+
+  <div class="cards">
+    <div class="kpi"><div class="rot">Acerto total estimado</div>
+      <div class="val">${curto(c.somaAcerto)}</div>
+      <div class="pe">se todas desligassem hoje</div></div>
+    <div class="kpi"><div class="rot">Comissão histórica</div>
+      <div class="val">${curto(c.totalComissaoHistorica)}</div>
+      <div class="pe">estimada, desde o início</div></div>
+    <div class="kpi"><div class="rot">Comissão 12 meses</div>
+      <div class="val">${curto(c.comissao12)}</div>
+      <div class="pe">estimada</div></div>
+    <div class="kpi"><div class="rot">Base de cálculo</div>
+      <div class="val down">${c.descontamST}</div>
+      <div class="pe">fábricas descontam ST · ${c.descontamIPI} descontam IPI</div></div>
+  </div>
+
+  <h3>Se a fábrica desligar hoje</h3>
+  <div class="sub">Acerto = 1/12 da comissão de toda a representação (art. 27, "j") + aviso prévio
+    de 1/3 das comissões dos três meses anteriores (art. 34). A data de início vem do primeiro
+    pedido no Mercos enquanto o contrato não for anexado — o que <b>subestima</b> quem começou
+    antes do sistema. As barrinhas são os últimos 24 meses de faturamento.</div>
+  ${c.linhas.map((l) => renderFabrica(l, anexos)).join('')}
+
+  <h3>Base de cálculo da comissão</h3>
+  <div class="sub">O art. 32, § 4º da Lei 4.886/65 diz que as comissões devem ser calculadas
+    <b>pelo valor total das mercadorias</b>. O cadastro do Mercos mostra que
+    ${c.descontamST} fábricas descontam ST e ${c.descontamIPI} descontam também IPI antes de
+    calcular sua comissão. <b>Isso é uma divergência conhecida, não uma conclusão:</b> há decisão
+    nos dois sentidos sobre excluir imposto da base. É o ponto de maior valor potencial aqui e o
+    primeiro a levar a um advogado — com o informe de rendimentos na mão, não com esta tela.</div>
+
+  <div class="rolagem"><table>
+    <thead><tr><th>Fábrica</th><th>%</th><th>Desconta</th><th>Faturamento total</th><th>Comissão estimada</th></tr></thead>
+    <tbody>${c.linhas.map((l) => `<tr>
+      <td>${esc(l.nome)}</td>
+      <td>${l.pct != null ? l.pct.toFixed(2).replace('.', ',') : '--'}</td>
+      <td>${[l.meta.descontaIPI ? 'IPI' : '', l.meta.descontaST ? 'ST' : ''].filter(Boolean).join(' + ') || '--'}</td>
+      <td>${fmt(l.totalFat)}</td>
+      <td>${fmt(l.totalCom)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>
+
+  <div class="nota">Atualizado ${c.atualizadoEm ? new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
+  }).format(new Date(c.atualizadoEm)) : '--'} · o levantamento jurídico roda uma vez por dia.
+  Prescrição de cinco anos (art. 44, parágrafo único) corre sobre cada parcela não paga.</div>`;
+
+  ligar();
+}
+
+function ligar() {
+  const b = document.getElementById('btn-recarregar');
+  if (b) b.addEventListener('click', carregar);
+  document.querySelectorAll('[data-anexo]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const nome = el.getAttribute('data-anexo');
+      const a = lerAnexos();
+      const atual = a[nome] || {};
+      const contrato = prompt('Contrato de ' + nome + ' — nome ou local do arquivo (vazio para limpar):', atual.contrato || '');
+      if (contrato === null) return;
+      const inicio = prompt('Data de início no contrato (AAAA-MM-DD) — vazio usa o 1º pedido:', atual.inicio || '');
+      if (inicio === null) return;
+      const informe = prompt('Informe de rendimentos — nome ou local do arquivo:', atual.informe || '');
+      if (informe === null) return;
+      a[nome] = { contrato: contrato.trim(), inicio: inicio.trim(), informe: informe.trim() };
+      salvarAnexos(a);
+      render();
+    });
+  });
+}
+
+async function carregar() {
+  state.erro = null; state.jur = null; render();
+  try {
+    state.jur = await apiFetch('/api/juridico');
+  } catch (e) {
+    state.erro = e.message || 'Não foi possível carregar o jurídico.';
+  }
+  /* Fabricas ativas vem da analise de vendas: so quem faturou nos ultimos 12
+   * meses entra na soma do acerto total. Falhar aqui nao derruba a tela. */
+  try {
+    const an = await apiFetch('/api/fabricas/analise');
+    state.ativas = (an.fabricas || []).filter((f) => (f.total12 || 0) > 0).map((f) => f.nome);
+  } catch (e) { state.ativas = null; }
+  render();
+}
+
+carregar();
+</script>
+</body>
+</html>
