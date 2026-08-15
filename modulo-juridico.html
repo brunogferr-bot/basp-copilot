@@ -643,7 +643,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'quitacao',
     quando: 'presente',
-    re: /quita[çc][ãa]o\s+(ampla|geral|plena|irrevog|irrestrita)|nada\s+mais\s+(a|ter[áa])\s*(que)?\s*reclamar|quita[çc][ãa]o\s+de\s+todo/i,
+    re: /(ampla|geral|plena|irrevogavel|irrestrit)[a-z]*[\s,e]{1,12}(ampla|geral|plena|irrevogavel|irrestrit)?[a-z]*[\s,e]{0,12}quita|quita[a-z]*[\s,]{1,12}(a mais )?(ampla|geral|plena|irrevogavel|irrestrit)|nada mais[\s\S]{0,25}reclamar|quita[a-z]*\s+de\s+tod/i,
     titulo: 'Quitação ampla e geral',
     porque: 'Quitação genérica encerra a discussão sobre comissão atrasada, diferença de base de cálculo e tudo que não foi conferido.',
     texto: 'A quitação ora outorgada restringe-se exclusivamente às verbas discriminadas e '
@@ -655,7 +655,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'delcredere',
     quando: 'presente',
-    re: /del\s*credere|estorn\w+|respons[áa]vel\s+pela\s+(solv[êe]ncia|inadimpl)|inadimpl\w+\s+do\s+cliente/i,
+    re: /del\s*credere|estorn[a-z]*|responsavel\s+pela\s+(solvencia|inadimpl)|inadimpl[a-z]*/i,
     titulo: 'Estorno de comissão ou responsabilidade pelo cliente',
     porque: 'Cláusula que devolve comissão por calote da loja é del credere disfarçado, e a lei proíbe.',
     texto: 'Nos termos do art. 43 da Lei 4.886/65, é vedada a inclusão de cláusula del credere. '
@@ -666,7 +666,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'foro',
     quando: 'presente',
-    re: /foro\s+d[ao]\s+comarca|elegem\s+o\s+foro|foro\s+de\s+elei[çc][ãa]o/i,
+    re: /foro\s+d[ao]\s+comarca|elege[a-z]*\s+o\s+foro|foro\s+de\s+eleicao|fica\s+eleito\s+o\s+foro/i,
     titulo: 'Foro de eleição',
     porque: 'Cláusula que joga a discussão para a comarca da fábrica contraria a regra protetiva.',
     texto: 'Fica eleito o foro do domicílio do representante comercial para dirimir as controvérsias '
@@ -676,7 +676,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'renuncia',
     quando: 'presente',
-    re: /ren[úu]ncia|renunci\w+|abre\s+m[ãa]o|desiste\s+de\s+qualquer/i,
+    re: /renuncia[a-z]*|renunci[a-z]*|abre\s+mao|desiste\s+de/i,
     titulo: 'Renúncia a direitos',
     porque: 'A lei da representação é protetiva; renúncia genérica a direitos dela tende a não valer.',
     texto: 'Não há renúncia a direitos assegurados pela Lei 4.886/65, cujas disposições são de '
@@ -686,7 +686,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'impostos',
     quando: 'presente',
-    re: /IPI|substitui[çc][ãa]o\s+tribut|\bICMS-ST\b|dedu[çc][ãa]o\s+de\s+imposto/i,
+    re: /\bipi\b|substituicao\s+tribut|icms-?st|deducao\s+de\s+imposto/i,
     titulo: 'Imposto saindo da base da comissão',
     porque: 'A lei manda calcular sobre o valor total das mercadorias.',
     texto: 'As comissões devidas são calculadas sobre o valor total das mercadorias, nos termos do '
@@ -697,7 +697,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'confidencial',
     quando: 'presente',
-    re: /n[ãa]o\s*[- ]?concorr[êe]ncia|n[ãa]o\s+competir|exclusividade\s+ap[óo]s|ap[óo]s\s+o\s+t[ée]rmino.{0,40}n[ãa]o\s+poder[áa]/i,
+    re: /nao[\s-]*concorrencia|nao\s+competir|exclusividade\s+apos|apos\s+o\s+termino[\s\S]{0,60}nao\s+poder/i,
     titulo: 'Não concorrência depois do fim',
     porque: 'Restringir sua atuação depois do encerramento, sem contrapartida financeira, limita seu ganha-pão.',
     texto: 'Eventual obrigação de não concorrência posterior ao término da representação depende de '
@@ -708,7 +708,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'indenizacao',
     quando: 'ausente',
-    re: /indeniza[çc][ãa]o|1\/12|um\s+doze\s+avos/i,
+    re: /indenizacao|1\/12|um\s+doze\s+avos/i,
     titulo: 'Indenização do art. 27, "j" não mencionada',
     porque: 'O termo não trata da indenização mínima de 1/12 de toda a representação.',
     texto: 'A título de indenização pela rescisão, nos termos do art. 27, alínea "j", da Lei '
@@ -720,7 +720,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'aviso',
     quando: 'ausente',
-    re: /aviso\s*pr[ée]vio|pr[ée]-?aviso/i,
+    re: /aviso\s*previo|pre-?aviso/i,
     titulo: 'Aviso prévio não mencionado',
     porque: 'O termo não trata do aviso prévio nem da indenização substitutiva.',
     texto: 'Não concedido o aviso prévio de 30 dias, a representada pagará a importância de '
@@ -731,7 +731,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'carteira',
     quando: 'ausente',
-    re: /pedidos?\s+em\s+carteira|em\s+fase\s+de\s+execu[çc][ãa]o|pedidos?\s+pendentes/i,
+    re: /pedidos?\s+em\s+carteira|em\s+fase\s+de\s+execucao|pedidos?\s+pendentes/i,
     titulo: 'Pedidos em carteira não mencionados',
     porque: 'Pedidos já colocados e ainda não faturados continuam gerando comissão.',
     texto: 'As comissões relativas a pedidos em carteira ou em fase de execução e recebimento '
@@ -742,7 +742,7 @@ const REGRAS_CONTRATO = [
   {
     id: 'prazopag',
     quando: 'ausente',
-    re: /at[ée]\s+o\s+dia\s+15|prazo\s+(de|para)\s+pagamento|corre[çc][ãa]o\s+monet[áa]ria/i,
+    re: /ate\s+o\s+dia\s+15|prazo\s+(de|para)\s+pagamento|correcao\s+monetaria/i,
     titulo: 'Prazo de pagamento e correção não definidos',
     porque: 'Sem prazo escrito, o pagamento fica ao arbítrio da fábrica.',
     texto: 'O pagamento das verbas ora ajustadas ocorrerá até o dia 15 do mês subsequente, '
@@ -754,6 +754,8 @@ const REGRAS_CONTRATO = [
 
 function revisarContrato(texto, l) {
   const paras = String(texto || '').split(/\n\s*\n/);
+  /* Compara sem acento e em minusculas: contrato vem escrito de todo jeito. */
+  const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const umDoze = fmt(l.umDoze).replace('R$ ', '');
   const aviso = fmt(l.aviso).replace('R$ ', '');
   const preencher = (t) => t.replace('{UMDOZE}', umDoze).replace('{AVISO}', aviso);
@@ -764,14 +766,14 @@ function revisarContrato(texto, l) {
   paras.forEach((par) => {
     saida.push({ tipo: 'orig', texto: par });
     REGRAS_CONTRATO.filter((r) => r.quando === 'presente').forEach((r) => {
-      if (!r.re.test(par)) return;
+      if (!r.re.test(norm(par))) return;
       if (achados.some((a) => a.id === r.id)) return;   // uma vez por regra
       achados.push({ ...r, onde: 'no texto' });
       saida.push({ tipo: 'novo', texto: preencher(r.texto), regra: r });
     });
   });
 
-  const ausentes = REGRAS_CONTRATO.filter((r) => r.quando === 'ausente' && !r.re.test(texto));
+  const ausentes = REGRAS_CONTRATO.filter((r) => r.quando === 'ausente' && !r.re.test(norm(texto)));
   ausentes.forEach((r) => {
     achados.push({ ...r, onde: 'faltando' });
     saida.push({ tipo: 'novo', texto: preencher(r.texto), regra: r, acrescentada: true });
