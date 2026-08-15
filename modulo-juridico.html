@@ -121,7 +121,7 @@ async function apiFetch(path) {
   return body;
 }
 
-const state = { jur: null, erro: null, ativas: null };
+const state = { jur: null, erro: null, ativas: null, tela: 'lista', fabricaEnc: null, encerramentos: null };
 
 const fmt = (n) => (n == null ? '--' :
   'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -337,6 +337,7 @@ function renderFabrica(l, anexos) {
       Contrato: <b>${a.contrato ? esc(a.contrato) : 'não anexado'}</b>
       · Informe de rendimentos: <b>${a.informe ? esc(a.informe) : 'não anexado'}</b>
       <button class="btn btn-sm" data-anexo="${esc(l.nome)}" style="margin-left:8px">Registrar documento</button>
+      <button class="btn btn-sm" data-encerrar="${esc(l.nome)}" style="margin-left:6px">${encDe(l.nome) ? 'Ver encerramento' : 'Iniciar encerramento'}</button>
     </div>
   </div>`;
 }
@@ -470,8 +471,300 @@ function renderVigia(c) {
   </div>`).join('')}`;
 }
 
+
+/* =====================================================================
+ * ENCERRAMENTO DE REPRESENTACAO
+ *
+ * O momento em que uma fabrica desliga a BASP e o momento de maior valor e de
+ * maior risco desta tela. Valor porque e quando o 1/12 de anos de trabalho vira
+ * dinheiro. Risco porque quase tudo que se perde ali se perde por pressa: aceitar
+ * proposta antes de conferir, assinar quitacao ampla, deixar prazo correr.
+ *
+ * Por isso o fluxo e deliberadamente lento:
+ *   1. confirma que o desligamento e real (nada comeca por clique acidental)
+ *   2. mostra o que cuidar ANTES de mostrar o dinheiro
+ *   3. abre o calculo com a formula visivel, nao so o resultado
+ *   4. deixa lancar a proposta da fabrica e compara com o minimo legal
+ *   5. permite fechar parcial e continuar depois, com historico de rodadas
+ *
+ * O estado mora no servidor: negociacao dura semanas e o Bruno acompanha do
+ * celular. Nada aqui e enviado para a fabrica - e caderno de anotacao, nao
+ * canal de comunicacao.
+ *
+ * NAO E PARECER. A tela cita o artigo e mostra a conta; quem negocia e ele,
+ * com advogado. O piso legal nao e teto: acordo pode ser maior.
+ * ===================================================================== */
+
+function encDe(nome) {
+  return (state.encerramentos && state.encerramentos[nome]) || null;
+}
+
+async function salvarEncerramentos() {
+  try {
+    await fetch(getApiBase().replace(/\/$/, '') + '/api/juridico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+      body: JSON.stringify({ apenasEncerramentos: true, encerramentos: state.encerramentos || {} }),
+    });
+  } catch (e) {
+    alert('Não consegui salvar no servidor. O que você digitou está na tela, mas pode se perder ao fechar.');
+  }
+}
+
+function iniciarEncerramento(nome) {
+  const ok = confirm(
+    'Você está realmente sendo desligado da fábrica ' + nome + '?\n\n'
+    + 'Ao clicar em OK, o Copilot inicia o processo de cálculo e encerramento das atividades '
+    + 'desta representação.\n\n'
+    + 'Nada é enviado à fábrica. É o seu caderno de negociação.'
+  );
+  if (!ok) return;
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  if (!state.encerramentos) state.encerramentos = {};
+  state.encerramentos[nome] = {
+    iniciadoEm: hoje,
+    status: 'aberto',
+    comunicadoEm: '',
+    proposta: { indenizacao: 0, aviso: 0, pendentes: 0, outros: 0 },
+    rodadas: [],
+    checklist: {},
+  };
+  salvarEncerramentos();
+  state.tela = 'encerramento';
+  state.fabricaEnc = nome;
+  render();
+}
+
+/* O que cuidar. Cada item cita o dispositivo e diz o que fazer, nao so o que
+ * a lei diz. Ordem por urgencia real: o que prescreve ou se perde primeiro. */
+const CUIDADOS = [
+  {
+    t: 'Exija a comunicação por escrito, com data',
+    x: 'A data do aviso é o marco de tudo: começa o prazo de 30 dias, define quais pedidos ainda '
+      + 'geram comissão e conta para o cálculo do aviso prévio. Comunicação verbal deixa você sem marco.',
+    lei: 'Lei 4.886/65, art. 34',
+  },
+  {
+    t: 'Não assine quitação ampla e geral',
+    x: 'Assinar "quitação de todo e qualquer direito" antes de conferir o cálculo encerra a discussão '
+      + 'sobre comissões atrasadas, base de cálculo e diferença de indenização. Assine quitação do que '
+      + 'foi efetivamente pago, item a item.',
+    lei: 'Princípio geral — a quitação vale pelo que descreve',
+  },
+  {
+    t: 'Levante os pedidos em carteira agora',
+    x: 'Pedidos já colocados e ainda não faturados continuam gerando comissão, e em rescisão injusta '
+      + 'eles vencem na data da rescisão. Feche essa lista antes que o acesso ao sistema da fábrica caia.',
+    lei: 'Lei 4.886/65, art. 32, § 5º',
+  },
+  {
+    t: 'Se alegarem justa causa, exija o motivo por escrito',
+    x: 'Justa causa afasta a indenização e o aviso prévio — por isso é a primeira coisa que se alega. '
+      + 'A lista do art. 35 é fechada: desídia, descrédito comercial, descumprimento do contrato, '
+      + 'condenação criminal e força maior. Fora disso, não é justa causa.',
+    lei: 'Lei 4.886/65, arts. 35 e 37',
+  },
+  {
+    t: 'Confira a base de cálculo da comissão',
+    x: 'A lei manda calcular sobre o valor total das mercadorias. Se a fábrica descontou IPI ou ST ao '
+      + 'longo dos anos, a diferença acumulada entra na conversa do acerto — é o momento de levantar '
+      + 'isso, não depois.',
+    lei: 'Lei 4.886/65, art. 32, § 4º',
+  },
+  {
+    t: 'Cláusula de estorno por inadimplência do cliente é nula',
+    x: 'Se o contrato manda devolver comissão porque a loja não pagou, isso é del credere disfarçado. '
+      + 'A única hipótese legal de não receber é insolvência do comprador — e ela precisa ser provada.',
+    lei: 'Lei 4.886/65, arts. 43 e 33, § 1º',
+  },
+  {
+    t: 'A discussão é no seu foro',
+    x: 'Cláusula que elege o foro da sede da fábrica tende a ser afastada. A ação corre no seu '
+      + 'domicílio, na Justiça Comum.',
+    lei: 'Lei 4.886/65, art. 39',
+  },
+  {
+    t: 'O relógio de cinco anos continua correndo',
+    x: 'Comissão antiga não paga prescreve em cinco anos, parcela a parcela. O acerto é a última '
+      + 'chance prática de cobrar o que ficou para trás.',
+    lei: 'Lei 4.886/65, art. 44, parágrafo único',
+  },
+];
+
+function calcEncerramento(l) {
+  const e = encDe(l.nome) || {};
+  const p = e.proposta || {};
+  const minimo = (l.umDoze || 0) + (l.aviso || 0);
+  const ofertado = (Number(p.indenizacao) || 0) + (Number(p.aviso) || 0)
+    + (Number(p.pendentes) || 0) + (Number(p.outros) || 0);
+  const difIndeniz = (Number(p.indenizacao) || 0) - (l.umDoze || 0);
+  const difAviso = (Number(p.aviso) || 0) - (l.aviso || 0);
+  return { e, p, minimo, ofertado, difIndeniz, difAviso, dif: ofertado - minimo };
+}
+
+function renderEncerramento() {
+  const c = calcular();
+  const l = c && c.linhas.find((x) => x.nome === state.fabricaEnc);
+  if (!l) return '<div class="vazio">Fábrica não encontrada.</div>';
+  const k = calcEncerramento(l);
+  const e = k.e;
+  const abertos = (l.vigia && l.vigia.abertos) || [];
+  const somaAbertos = abertos.reduce((s, o) => s + (o.valor || 0), 0);
+
+  const cor = k.ofertado === 0 ? 'neutro' : (k.dif >= 0 ? 'up' : 'down');
+
+  return `<div class="topbar">
+    <div class="brand">Encerramento<small>${esc(l.nome)}</small></div>
+    <div><button class="btn btn-sm" id="btn-voltar">← Voltar</button></div>
+  </div>
+
+  <div class="tarja">
+    <b>Processo de encerramento aberto em ${e.iniciadoEm ? e.iniciadoEm.split('-').reverse().join('/') : '--'}.</b>
+    Isto é o seu caderno de negociação: nada daqui é enviado à fábrica. Os valores são calculados
+    sobre faturamento × percentual, sem o desconto de IPI e ST que a fábrica aplica — confira com o
+    informe de rendimentos antes de fechar. O piso legal <b>não é teto</b>: acordo pode ser maior.
+  </div>
+
+  <h3>1. O que você precisa cuidar agora</h3>
+  <div class="sub">Marque conforme resolver. Fica salvo.</div>
+  ${CUIDADOS.map((cd, i) => `<div class="fab">
+    <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+      <input type="checkbox" data-cuidado="${i}" ${(e.checklist && e.checklist[i]) ? 'checked' : ''} style="margin-top:4px">
+      <span>
+        <div class="nome">${esc(cd.t)}</div>
+        <div style="font-size:13.5px;line-height:1.6;margin-top:4px">${esc(cd.x)}</div>
+        <div class="anexo" style="border-top-style:dashed">${esc(cd.lei)}</div>
+      </span>
+    </label>
+  </div>`).join('')}
+
+  <h3>2. O cálculo</h3>
+  <div class="sub">Fórmula aberta, para você conferir na mão.</div>
+  <div class="fab">
+    <table>
+      <tbody>
+        <tr><td>Comissão de toda a representação<br><span class="neutro" style="font-size:12px">${fmt(l.totalFat)} × ${l.pct}% · desde ${l.primeiraData ? l.primeiraData.split('-').reverse().join('/') : '--'} · ${l.pedidos} pedidos</span></td>
+            <td>${fmt(l.totalCom)}</td></tr>
+        <tr><td><b>Indenização — 1/12</b><br><span class="neutro" style="font-size:12px">art. 27, "j" · piso legal, não teto</span></td>
+            <td><b>${fmt(l.umDoze)}</b></td></tr>
+        <tr><td><b>Aviso prévio</b><br><span class="neutro" style="font-size:12px">art. 34 · 1/3 das comissões dos 3 meses anteriores</span></td>
+            <td><b>${fmt(l.aviso)}</b></td></tr>
+        <tr><td><b>Mínimo legal</b></td><td><b>${fmt(k.minimo)}</b></td></tr>
+        <tr><td>Propostas em aberto no sistema<br><span class="neutro" style="font-size:12px">${abertos.length} pedidos · art. 32, § 5º — vencem na data da rescisão</span></td>
+            <td>${fmt(somaAbertos)}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3. A proposta da fábrica</h3>
+  <div class="sub">Lance o que eles ofereceram. A comparação é automática.</div>
+  <div class="fab">
+    <div class="grade">
+      <div class="cel"><div class="r">Indenização</div>
+        <input class="btn" style="width:100%" type="number" step="0.01" data-prop="indenizacao" value="${k.p.indenizacao || ''}"></div>
+      <div class="cel"><div class="r">Aviso prévio</div>
+        <input class="btn" style="width:100%" type="number" step="0.01" data-prop="aviso" value="${k.p.aviso || ''}"></div>
+      <div class="cel"><div class="r">Comissões pendentes</div>
+        <input class="btn" style="width:100%" type="number" step="0.01" data-prop="pendentes" value="${k.p.pendentes || ''}"></div>
+      <div class="cel"><div class="r">Outros</div>
+        <input class="btn" style="width:100%" type="number" step="0.01" data-prop="outros" value="${k.p.outros || ''}"></div>
+    </div>
+
+    <div class="grade" style="margin-top:12px">
+      <div class="cel"><div class="r">Proposta total</div><div class="v">${fmt(k.ofertado)}</div></div>
+      <div class="cel"><div class="r">Mínimo legal</div><div class="v">${fmt(k.minimo)}</div></div>
+      <div class="cel"><div class="r">Diferença</div><div class="v ${cor}">${k.ofertado ? (k.dif >= 0 ? '+' : '') + fmt(k.dif) : '--'}</div></div>
+    </div>
+
+    ${k.ofertado && k.dif < 0 ? `<div class="tarja" style="margin-top:12px">
+      A proposta está <b>${fmt(-k.dif)} abaixo</b> do piso do art. 27, "j" somado ao art. 34.
+      ${k.difIndeniz < 0 ? 'A indenização oferecida está ' + fmt(-k.difIndeniz) + ' abaixo do 1/12. ' : ''}${k.difAviso < 0 ? 'O aviso prévio está ' + fmt(-k.difAviso) + ' abaixo. ' : ''}
+      Isso não significa que seja ilegal fechar — significa que você está abrindo mão de valor que a
+      lei garante como mínimo, e é bom saber quanto.
+    </div>` : ''}
+  </div>
+
+  <h3>4. Fechamento</h3>
+  <div class="sub">Registre cada rodada. Fechar parcial mantém o processo aberto.</div>
+  <div class="fab">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="btn-parcial">Salvar rodada (parcial)</button>
+      <button class="btn" id="btn-encerrar">Marcar negociação como encerrada</button>
+      ${e.status === 'encerrado' ? '<button class="btn" id="btn-reabrir">Reabrir</button>' : ''}
+    </div>
+    <div class="anexo">Status: <b>${e.status === 'encerrado' ? 'encerrado' : 'em negociação'}</b>
+      ${(e.rodadas || []).length ? '· ' + e.rodadas.length + ' rodada(s) registrada(s)' : ''}</div>
+    ${(e.rodadas || []).slice().reverse().map((r) => `<div class="anexo">
+      <b>${r.data.split('-').reverse().join('/')}</b> — proposta ${fmt(r.total)}
+      (${r.dif >= 0 ? '+' : ''}${fmt(r.dif)} vs mínimo)${r.obs ? ' · ' + esc(r.obs) : ''}
+    </div>`).join('')}
+  </div>`;
+}
+
+
+/* Eventos da tela de encerramento. Tudo que o Bruno digita vai para o servidor
+ * assim que ele sai do campo - negociacao nao pode depender de ele lembrar de
+ * apertar salvar. */
+function ligarEncerramento() {
+  const nome = state.fabricaEnc;
+  const e = encDe(nome);
+  if (!e) return;
+
+  const v = document.getElementById('btn-voltar');
+  if (v) v.addEventListener('click', () => { state.tela = 'lista'; state.fabricaEnc = null; render(); });
+
+  document.querySelectorAll('[data-cuidado]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (!e.checklist) e.checklist = {};
+      e.checklist[el.getAttribute('data-cuidado')] = el.checked;
+      salvarEncerramentos();
+    });
+  });
+
+  document.querySelectorAll('[data-prop]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (!e.proposta) e.proposta = {};
+      e.proposta[el.getAttribute('data-prop')] = Number(el.value) || 0;
+      salvarEncerramentos();
+      render();
+    });
+  });
+
+  const par = document.getElementById('btn-parcial');
+  if (par) par.addEventListener('click', () => {
+    const c = calcular();
+    const l = c.linhas.find((x) => x.nome === nome);
+    const k = calcEncerramento(l);
+    const obs = prompt('Observação desta rodada (opcional):', '');
+    if (obs === null) return;
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    if (!e.rodadas) e.rodadas = [];
+    e.rodadas.push({ data: hoje, total: k.ofertado, dif: k.dif, obs: obs.trim() });
+    e.status = 'aberto';
+    salvarEncerramentos();
+    render();
+  });
+
+  const enc = document.getElementById('btn-encerrar');
+  if (enc) enc.addEventListener('click', () => {
+    if (!confirm('Marcar a negociação com ' + nome + ' como encerrada?\n\nO histórico fica guardado e você pode reabrir.')) return;
+    e.status = 'encerrado';
+    salvarEncerramentos();
+    render();
+  });
+
+  const re = document.getElementById('btn-reabrir');
+  if (re) re.addEventListener('click', () => { e.status = 'aberto'; salvarEncerramentos(); render(); });
+}
+
 function render() {
   const app = document.getElementById('app');
+
+  if (state.tela === 'encerramento' && state.fabricaEnc) {
+    app.innerHTML = renderEncerramento();
+    ligarEncerramento();
+    return;
+  }
 
   const topo = `<div class="topbar">
     <div class="brand">BASP Copilot<small>Jurídico</small></div>
@@ -566,6 +859,13 @@ function render() {
 function ligar() {
   const b = document.getElementById('btn-recarregar');
   if (b) b.addEventListener('click', carregar);
+  document.querySelectorAll('[data-encerrar]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const nome = el.getAttribute('data-encerrar');
+      if (encDe(nome)) { state.tela = 'encerramento'; state.fabricaEnc = nome; render(); return; }
+      iniciarEncerramento(nome);
+    });
+  });
   document.querySelectorAll('[data-anexo]').forEach((el) => {
     el.addEventListener('click', () => {
       const nome = el.getAttribute('data-anexo');
@@ -588,6 +888,7 @@ async function carregar() {
   state.erro = null; state.jur = null; render();
   try {
     state.jur = await apiFetch('/api/juridico');
+    state.encerramentos = (state.jur && state.jur.encerramentos) || {};
   } catch (e) {
     state.erro = e.message || 'Não foi possível carregar o jurídico.';
   }
