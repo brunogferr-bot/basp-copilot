@@ -135,7 +135,7 @@ async function apiFetch(path) {
   return body;
 }
 
-const state = { jur: null, erro: null, ativas: null, tela: 'lista', fabricaEnc: null, encerramentos: null };
+const state = { jur: null, erro: null, ativas: null, tela: 'lista', fabricaEnc: null, encerramentos: null, fabricaCtr: null, contratos: null };
 
 const fmt = (n) => (n == null ? '--' :
   'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -308,6 +308,12 @@ function renderFabrica(l, anexos) {
   if (l.varMedia != null && l.varMedia <= -0.15) {
     flags.push(`<span class="flag alerta">média caiu ${Math.round(l.varMedia * 100)}% em 6 meses</span>`);
   }
+  const ct = ctrDe(l.nome);
+  if (!ct || !ct.texto) {
+    flags.push('<span class="flag alerta" style="border-color:#c05c52;color:#c05c52;background:rgba(192,92,82,.10)">SEM CONTRATO REGISTRADO</span>');
+  } else if (ct.analise && ct.analise.graves) {
+    flags.push('<span class="flag alerta">' + ct.analise.graves + ' ponto(s) grave(s) no contrato</span>');
+  }
   if (!l.registrada) flags.push('<span class="flag">comissão estimada, sem registro no Mercos</span>');
   /* TAXA EFETIVA, e nao "diferenca de base".
    * Conferido em 14/08/2026: valor_total_comissao do Mercos e exatamente
@@ -351,6 +357,7 @@ function renderFabrica(l, anexos) {
       Contrato: <b>${a.contrato ? esc(a.contrato) : 'não anexado'}</b>
       · Informe de rendimentos: <b>${a.informe ? esc(a.informe) : 'não anexado'}</b>
       <button class="btn btn-sm" data-anexo="${esc(l.nome)}" style="margin-left:8px">Registrar documento</button>
+      <button class="btn btn-sm" data-contrato="${esc(l.nome)}" style="margin-left:6px">${(ctrDe(l.nome) && ctrDe(l.nome).texto) ? 'Contrato' : '⚠ Sem contrato'}</button>
       <button class="btn btn-sm" data-encerrar="${esc(l.nome)}" style="margin-left:6px">${encDe(l.nome) ? 'Ver encerramento' : 'Iniciar encerramento'}</button>
     </div>
   </div>`;
@@ -782,6 +789,193 @@ function revisarContrato(texto, l) {
   return { saida, achados, ausentes: ausentes.length };
 }
 
+
+/* =====================================================================
+ * CONTRATO VIGENTE DE CADA REPRESENTADA
+ *
+ * Os contratos que a BASP assinou ao longo dos anos foram assinados sem
+ * revisao. Nao da para desfazer isso, mas da para SABER o que foi assinado -
+ * e chegar numa eventual rescisao com a lista pronta do que sempre esteve
+ * errado, em vez de descobrir na hora da briga.
+ *
+ * A VARREDURA cobre os artigos que protegem o representante, nao so os de
+ * rescisao:
+ *   art. 27      clausulas obrigatorias do contrato
+ *   art. 31      zona e exclusividade
+ *   art. 32      comissao: nascimento, prazo, base, reducao de media
+ *   art. 33      prazo de recusa da proposta
+ *   art. 34      aviso previo
+ *   art. 35/36   justas causas, dos dois lados
+ *   art. 37      retencao de comissao
+ *   art. 39      foro
+ *   art. 41/42   pluralidade de representadas e sub-representacao
+ *   art. 43      del credere
+ *   art. 44      falencia e prescricao
+ *   art. 45      auxilio-doenca
+ *   CC 715/716   asfixia e negocio frustrado por culpa do proponente
+ *
+ * LIMITE HONESTO: isto e conferencia por lista, nao leitura juridica. Nao
+ * entende contexto nem clausula escrita de forma criativa. Serve para separar
+ * o que precisa de olho humano do que esta evidentemente em ordem.
+ * ===================================================================== */
+
+const REGRAS_VIGENTE = [
+  { id: 'zona', quando: 'ausente', re: /zona|territorio|regiao|area de atuacao/i,
+    titulo: 'Zona de atuação não delimitada', grave: true,
+    porque: 'Sem zona escrita, você não consegue provar quebra de exclusividade nem cobrar comissão de venda direta na sua área.',
+    lei: 'Lei 4.886/65, art. 27, "d" — a indicação da zona é cláusula obrigatória' },
+  { id: 'exclusiv', quando: 'ausente', re: /exclusividade/i,
+    titulo: 'Exclusividade não tratada', grave: false,
+    porque: 'O silêncio joga a favor: sem cláusula, a exclusividade de zona é presumida e você tem comissão sobre tudo vendido ali, inclusive venda direta da fábrica. Deixar como está costuma ser melhor que negociar cláusula ruim.',
+    lei: 'Lei 4.886/65, art. 31 — exclusividade de zona presumida no silêncio' },
+  { id: 'exclusivneg', quando: 'presente', re: /nao ha exclusividade|sem exclusividade|nao sera exclusiv|exclusividade nao/i,
+    titulo: 'Exclusividade de zona afastada por escrito', grave: true,
+    porque: 'Aqui a fábrica escreveu o que a lei presumiria a seu favor. Com isso ela pode vender direto na sua praça sem lhe pagar nada.',
+    lei: 'Lei 4.886/65, art. 31' },
+  { id: 'indeniz', quando: 'ausente', re: /indenizacao|1\/12|um doze avos|um quinze avos/i,
+    titulo: 'Indenização de rescisão não prevista', grave: true,
+    porque: 'É cláusula obrigatória. Sem ela, a discussão sobre o 1/12 começa do zero numa eventual rescisão.',
+    lei: 'Lei 4.886/65, art. 27, "j" — mínimo de 1/12 de toda a retribuição' },
+  { id: 'indenizbaixa', quando: 'presente', re: /1\/20|um vinte avos|1\/15|um quinze avos|0,?5%|meio por cento/i,
+    titulo: 'Indenização abaixo do piso legal', grave: true,
+    porque: 'O piso é 1/12. Fração menor não vale, por mais que esteja assinada.',
+    lei: 'Lei 4.886/65, art. 27, "j"' },
+  { id: 'delcred', quando: 'presente', re: /del ?credere|estorn|responsavel pela solvencia|inadimplencia do cliente/i,
+    titulo: 'Del credere ou estorno por inadimplência', grave: true,
+    porque: 'Cláusula nula. A única hipótese de não receber é insolvência comprovada do comprador.',
+    lei: 'Lei 4.886/65, arts. 43 e 33, § 1º' },
+  { id: 'base', quando: 'presente', re: /\bipi\b|substituicao tribut|icms-?st|liquido de imposto|deduzid[ao]s? os imposto/i,
+    titulo: 'Imposto deduzido da base da comissão', grave: true,
+    porque: 'A lei manda calcular sobre o valor total das mercadorias. Toda a diferença acumulada nos anos vira crédito discutível.',
+    lei: 'Lei 4.886/65, art. 32, § 4º' },
+  { id: 'prazopg', quando: 'ausente', re: /dia 15|prazo de pagamento|pagamento das comissoes sera|ate o dia/i,
+    titulo: 'Prazo de pagamento da comissão não definido', grave: false,
+    porque: 'Sem prazo escrito, atraso não vira inadimplência clara — e atraso de comissão é justa causa para você rescindir.',
+    lei: 'Lei 4.886/65, art. 32, § 1º, e art. 36, "d"' },
+  { id: 'recusa', quando: 'ausente', re: /recusa|prazo para recusar|nao aceitacao do pedido/i,
+    titulo: 'Prazo de recusa do pedido não previsto', grave: false,
+    porque: 'Sem cláusula, valem os prazos legais de 15, 30, 60 ou 120 dias conforme a praça — e o silêncio da fábrica no prazo obriga a creditar a comissão.',
+    lei: 'Lei 4.886/65, art. 33' },
+  { id: 'aviso', quando: 'ausente', re: /aviso previo|pre-?aviso|denuncia do contrato/i,
+    titulo: 'Aviso prévio não previsto', grave: false,
+    porque: 'Sem cláusula vale a regra legal: 30 dias ou 1/3 das comissões dos três meses anteriores.',
+    lei: 'Lei 4.886/65, art. 34' },
+  { id: 'foro', quando: 'presente', re: /foro d[ao] comarca|fica eleito o foro|foro de eleicao/i,
+    titulo: 'Foro de eleição', grave: false,
+    porque: 'Se elege a comarca da fábrica, tende a ser afastado: a lei manda no seu domicílio.',
+    lei: 'Lei 4.886/65, art. 39' },
+  { id: 'exclusivrep', quando: 'presente', re: /nao poder[aá] representar|exclusividade em favor|dedicacao exclusiva|somente para a representada/i,
+    titulo: 'Proibição de representar outras fábricas', grave: false,
+    porque: 'É válido se estiver expresso, mas fecha sua carteira. Vale saber que sem essa cláusula você pode representar quem quiser.',
+    lei: 'Lei 4.886/65, art. 41' },
+  { id: 'reducao', quando: 'presente', re: /poder[aá] reduzir|reduzir a zona|alterar a zona|redimensionar/i,
+    titulo: 'Fábrica pode reduzir sua zona',  grave: true,
+    porque: 'Redução de zona é justa causa para você rescindir com indenização. Cláusula que autoriza a redução tenta neutralizar isso.',
+    lei: 'Lei 4.886/65, art. 36, "a", e art. 32, § 7º' },
+  { id: 'prazodet', quando: 'presente', re: /prazo de (12|doze|24|vinte e quatro) meses|vigencia de 1 \(um\) ano|prazo determinado/i,
+    titulo: 'Contrato por prazo determinado', grave: false,
+    porque: 'Se já foi renovado, virou prazo indeterminado por força de lei — e a indenização passa a incidir sobre todo o período, não só o último contrato.',
+    lei: 'Lei 4.886/65, art. 27, §§ 2º e 3º' },
+];
+
+function analisarVigente(texto) {
+  const norm = String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const achados = [];
+  REGRAS_VIGENTE.forEach((r) => {
+    const tem = r.re.test(norm);
+    if ((r.quando === 'presente' && tem) || (r.quando === 'ausente' && !tem)) achados.push(r);
+  });
+  return {
+    achados,
+    graves: achados.filter((a) => a.grave).length,
+    analisadoEm: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
+  };
+}
+
+/* Modelo para fabrica sem contrato. Nao e "um contrato qualquer": e o art. 27
+ * cumprido alinea por alinea, com os dados reais da fabrica ja preenchidos.
+ * Cada clausula existe porque a lei manda ou porque a falta dela ja custou
+ * dinheiro a representante comercial. */
+function modeloContrato(l) {
+  const hoje = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const pct = l.pct != null ? String(l.pct).replace('.', ',') : '____';
+  const desde = l.primeiraData ? l.primeiraData.split('-').reverse().join('/') : '____';
+  return [
+    'CONTRATO DE REPRESENTAÇÃO COMERCIAL',
+    '',
+    'REPRESENTADA: ' + l.nome + ', inscrita no CNPJ sob nº ____________.',
+    'REPRESENTANTE: BASP REPRESENTAÇÕES, inscrita no CNPJ sob nº ____________,',
+    'registrada no CORE-MG sob nº ____________.',
+    '',
+    'As partes, que mantêm relação de representação comercial desde ' + desde + ',',
+    'formalizam neste instrumento as condições já praticadas, nos termos da Lei',
+    'nº 4.886/65, com as alterações da Lei nº 8.420/92.',
+    '',
+    'CLÁUSULA 1ª - OBJETO',
+    'A representada contrata a representante para, em caráter não eventual e sem',
+    'vínculo de emprego, agenciar propostas e pedidos de seus produtos, nos termos',
+    'do art. 1º da Lei 4.886/65.',
+    '',
+    'CLÁUSULA 2ª - PRODUTOS',
+    'A representação abrange toda a linha de produtos fabricada e comercializada',
+    'pela representada.',
+    '',
+    'CLÁUSULA 3ª - PRAZO',
+    'O presente contrato vigora por prazo indeterminado.',
+    '',
+    'CLÁUSULA 4ª - ZONA E EXCLUSIVIDADE',
+    'A representação será exercida com exclusividade nos Estados de Minas Gerais,',
+    'Goiás e no Distrito Federal. Fica assegurada à representante a comissão sobre',
+    'todos os negócios realizados na zona, ainda que diretamente pela representada',
+    'ou por intermédio de terceiros, na forma do art. 31 da Lei 4.886/65.',
+    '',
+    'CLÁUSULA 5ª - COMISSÃO',
+    'A comissão é de ' + pct + '% (' + pct + ' por cento), calculada sobre o VALOR TOTAL',
+    'das mercadorias, na forma do art. 32, § 4º, da Lei 4.886/65, vedada a dedução',
+    'de IPI, ICMS-ST, frete ou quaisquer outros encargos da base de cálculo.',
+    '',
+    'CLÁUSULA 6ª - PAGAMENTO',
+    'O direito à comissão nasce com o pagamento dos pedidos. O pagamento será',
+    'efetuado até o dia 15 do mês subsequente ao da liquidação da fatura,',
+    'acompanhado das respectivas notas fiscais, com correção monetária em caso de',
+    'atraso (art. 32, §§ 1º e 2º).',
+    '',
+    'CLÁUSULA 7ª - RECUSA DE PEDIDOS',
+    'A recusa de proposta deverá ser manifestada por escrito nos prazos do art. 33',
+    'da Lei 4.886/65 — 15, 30, 60 ou 120 dias conforme a praça do comprador —,',
+    'sob pena de a comissão ser devida.',
+    '',
+    'CLÁUSULA 8ª - VEDAÇÕES',
+    'É vedada a cláusula del credere (art. 43). A representante não responde pela',
+    'solvência dos clientes, ressalvada a hipótese do art. 33, § 1º. São vedadas',
+    'alterações que impliquem, direta ou indiretamente, diminuição da média dos',
+    'resultados auferidos nos últimos seis meses (art. 32, § 7º).',
+    '',
+    'CLÁUSULA 9ª - PLURALIDADE',
+    'A representante poderá exercer a atividade para outras empresas, desde que não',
+    'concorrentes, na forma do art. 41 da Lei 4.886/65.',
+    '',
+    'CLÁUSULA 10ª - RESCISÃO E INDENIZAÇÃO',
+    'A denúncia sem causa justificada obriga o denunciante a conceder aviso prévio',
+    'de 30 dias ou a pagar importância igual a 1/3 das comissões dos três meses',
+    'anteriores (art. 34). A rescisão fora das hipóteses do art. 35 obriga a',
+    'representada ao pagamento de indenização não inferior a 1/12 do total da',
+    'retribuição auferida durante todo o tempo da representação (art. 27, "j").',
+    'As comissões de pedidos em carteira vencem na data da rescisão (art. 32, § 5º).',
+    '',
+    'CLÁUSULA 11ª - FORO',
+    'Fica eleito o foro do domicílio da representante, na forma do art. 39 da Lei',
+    '4.886/65.',
+    '',
+    'E por estarem justas e contratadas, as partes assinam o presente em duas vias.',
+    '',
+    '____________, ' + hoje,
+    '',
+    '_______________________________     _______________________________',
+    'REPRESENTADA                        REPRESENTANTE',
+  ].join('\n');
+}
+
 function renderEncerramento() {
   const c = calcular();
   const l = c && c.linhas.find((x) => x.nome === state.fabricaEnc);
@@ -1011,8 +1205,111 @@ function ligarEncerramento() {
   });
 }
 
+
+function ctrDe(nome) { return (state.contratos && state.contratos[nome]) || null; }
+
+async function salvarContratos() {
+  try {
+    await fetch(getApiBase().replace(/\/$/, '') + '/api/juridico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-token': getApiToken() },
+      body: JSON.stringify({ apenasContratos: true, contratos: state.contratos || {} }),
+    });
+  } catch (e) {
+    alert('Não consegui salvar no servidor.');
+  }
+}
+
+function renderContrato() {
+  const c = calcular();
+  const l = c && c.linhas.find((x) => x.nome === state.fabricaCtr);
+  if (!l) return '<div class="vazio">Fábrica não encontrada.</div>';
+  const ct = ctrDe(l.nome) || {};
+  const an = ct.analise;
+
+  return `<div class="topbar">
+    <div class="brand">Contrato<small>${esc(l.nome)}</small></div>
+    <div><button class="btn btn-sm" id="btn-voltar-ctr">← Voltar</button></div>
+  </div>
+
+  ${ct.texto ? '' : '<div class="tarja" style="border-color:#c05c52;background:rgba(192,92,82,.12)"><b>Esta fábrica não tem contrato registrado.</b> Represente-a há ' + (l.primeiraData ? l.primeiraData.slice(0,4) : '--') + ' sem instrumento escrito significa que, numa rescisão, tudo se discute do zero. Use o modelo abaixo para propor a formalização.</div>'}
+
+  <h3>Contrato vigente</h3>
+  <div class="sub">Cole o contrato que está assinado hoje. Ele não vai ser alterado — a análise serve
+    para você saber, <b>antes</b> de uma rescisão, o que foi assinado sem orientação.</div>
+  <div class="fab">
+    <textarea class="campo" id="ctr-texto" placeholder="Cole aqui o contrato assinado com esta fábrica">${esc(ct.texto || '')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" id="btn-analisar">Analisar contra a lei</button>
+      <button class="btn" id="btn-modelo">${ct.texto ? 'Ver modelo ideal' : 'Gerar modelo para assinatura'}</button>
+    </div>
+    ${ct.analisadoEm ? '<div class="anexo">Analisado em ' + ct.analisadoEm.split('-').reverse().join('/') + '</div>' : ''}
+  </div>
+
+  ${an ? `<h3>${an.achados.length} ponto(s) encontrado(s)${an.graves ? ' · ' + an.graves + ' grave(s)' : ''}</h3>
+  <div class="sub">Conferência por lista contra os artigos protetivos. Não é leitura jurídica —
+    serve para separar o que precisa de olho humano.</div>
+  ${an.achados.map((a) => `<div class="fab" style="${a.grave ? 'border-color:#c05c52' : ''}">
+    <div class="nome">${a.grave ? '<span class="down">●</span> ' : ''}${esc(a.titulo)}</div>
+    <div style="font-size:13.5px;line-height:1.6;margin-top:5px">${esc(a.porque)}</div>
+    <div class="anexo" style="border-top-style:dashed">${esc(a.lei)}</div>
+  </div>`).join('')}` : ''}
+
+  ${ct.modelo ? `<h3>Modelo de contrato</h3>
+  <div class="sub">O art. 27 cumprido alínea por alínea, com os dados desta fábrica já preenchidos.
+    Leve a um advogado antes de enviar — é ponto de partida, não peça pronta.</div>
+  <div class="fab"><button class="btn" id="btn-copiar-modelo">Copiar modelo</button></div>
+  <div class="contrato" id="modelo-texto">${esc(ct.modelo)}</div>` : ''}`;
+}
+
+function ligarContrato() {
+  const nome = state.fabricaCtr;
+  if (!state.contratos) state.contratos = {};
+  if (!state.contratos[nome]) state.contratos[nome] = {};
+  const ct = state.contratos[nome];
+
+  const v = document.getElementById('btn-voltar-ctr');
+  if (v) v.addEventListener('click', () => { state.tela = 'lista'; state.fabricaCtr = null; render(); });
+
+  const an = document.getElementById('btn-analisar');
+  if (an) an.addEventListener('click', () => {
+    const ta = document.getElementById('ctr-texto');
+    const txt = (ta.value || '').trim();
+    if (!txt) { alert('Cole o texto do contrato antes de analisar.'); return; }
+    ct.texto = txt.slice(0, 80000);
+    const r = analisarVigente(ct.texto);
+    ct.analise = r;
+    ct.analisadoEm = r.analisadoEm;
+    salvarContratos();
+    render();
+  });
+
+  const mo = document.getElementById('btn-modelo');
+  if (mo) mo.addEventListener('click', () => {
+    const c = calcular();
+    const l = c.linhas.find((x) => x.nome === nome);
+    ct.modelo = modeloContrato(l);
+    salvarContratos();
+    render();
+  });
+
+  const cp = document.getElementById('btn-copiar-modelo');
+  if (cp) cp.addEventListener('click', () => {
+    navigator.clipboard.writeText(ct.modelo || '').then(
+      () => alert('Modelo copiado.'),
+      () => alert('Não consegui copiar. Selecione o texto na tela.')
+    );
+  });
+}
+
 function render() {
   const app = document.getElementById('app');
+
+  if (state.tela === 'contrato' && state.fabricaCtr) {
+    app.innerHTML = renderContrato();
+    ligarContrato();
+    return;
+  }
 
   if (state.tela === 'encerramento' && state.fabricaEnc) {
     app.innerHTML = renderEncerramento();
@@ -1058,6 +1355,16 @@ function render() {
   </div>
 
   ${c.semFiltro ? '<div class="tarja"><b>Não consegui carregar a lista de fábricas ativas.</b> Esta tela está mostrando todas as representadas que já faturaram, inclusive as encerradas e já acertadas. Recarregue para filtrar.</div>' : ''}
+
+  ${(() => {
+    const sem = c.linhas.filter((l) => { const t = ctrDe(l.nome); return !t || !t.texto; });
+    if (!sem.length) return '';
+    return '<div class="tarja" style="border-color:#c05c52;background:rgba(192,92,82,.12)">'
+      + '<b>' + sem.length + ' de ' + c.linhas.length + ' fábricas ativas sem contrato registrado:</b> '
+      + sem.map((l) => esc(l.nome)).join(' · ')
+      + '. Sem instrumento escrito, numa rescisão tudo se discute do zero — inclusive a data de início, '
+      + 'que é a base do 1/12. Abra cada uma e gere o modelo para propor a formalização.</div>';
+  })()}
 
   <div class="cards">
     <div class="kpi"><div class="rot">Acerto total estimado</div>
@@ -1113,6 +1420,13 @@ function render() {
 function ligar() {
   const b = document.getElementById('btn-recarregar');
   if (b) b.addEventListener('click', carregar);
+  document.querySelectorAll('[data-contrato]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.fabricaCtr = el.getAttribute('data-contrato');
+      state.tela = 'contrato';
+      render();
+    });
+  });
   document.querySelectorAll('[data-encerrar]').forEach((el) => {
     el.addEventListener('click', () => {
       const nome = el.getAttribute('data-encerrar');
@@ -1143,6 +1457,7 @@ async function carregar() {
   try {
     state.jur = await apiFetch('/api/juridico');
     state.encerramentos = (state.jur && state.jur.encerramentos) || {};
+    state.contratos = (state.jur && state.jur.contratos) || {};
   } catch (e) {
     state.erro = e.message || 'Não foi possível carregar o jurídico.';
   }
