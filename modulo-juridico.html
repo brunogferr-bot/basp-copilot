@@ -828,7 +828,7 @@ const REGRAS_VIGENTE = [
     titulo: 'Exclusividade não tratada', grave: false,
     porque: 'O silêncio joga a favor: sem cláusula, a exclusividade de zona é presumida e você tem comissão sobre tudo vendido ali, inclusive venda direta da fábrica. Deixar como está costuma ser melhor que negociar cláusula ruim.',
     lei: 'Lei 4.886/65, art. 31 — exclusividade de zona presumida no silêncio' },
-  { id: 'exclusivneg', quando: 'presente', re: /nao ha exclusividade|sem exclusividade|nao sera exclusiv|exclusividade nao/i,
+  { id: 'exclusivneg', quando: 'presente', re: /nao (ha|havera|existe|existira|sera)[a-z]*\s+exclusividade|sem exclusividade|exclusividade nao|podera nomear outros representantes|vender diretamente/i,
     titulo: 'Exclusividade de zona afastada por escrito', grave: true,
     porque: 'Aqui a fábrica escreveu o que a lei presumiria a seu favor. Com isso ela pode vender direto na sua praça sem lhe pagar nada.',
     lei: 'Lei 4.886/65, art. 31' },
