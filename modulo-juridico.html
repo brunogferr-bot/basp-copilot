@@ -191,22 +191,27 @@ function calcular() {
      * A DIFERENCA entre as duas e informacao juridica: e onde aparece, em
      * reais, o efeito de descontar imposto da base que o art. 32, par. 4o
      * discute. */
+    /* PERCENTUAL RETROATIVO - decisao do Bruno em 14/08/2026.
+     * Quando o cadastro do Mercos estava errado (Greice marcada 4% e Faruk 5%,
+     * quando o certo sempre foi 5,5% e 7%), o percentual correto vale para
+     * TODA a historia, nao daqui para frente. O cadastro nao registrava uma
+     * mudanca de acordo: registrava um erro.
+     * Por isso a conta principal e faturamento x percentual ATUAL. A comissao
+     * que o Mercos gravou fica ao lado, como comparacao - ela usa o percentual
+     * da epoca, que e justamente o que estava errado. */
     const comRegistrada = (j.comissaoTotal || {})[nome];
     const temReg = typeof comRegistrada === 'number' && comRegistrada > 0;
     const comSerie = (j.comissaoMensal || {})[nome] || null;
 
-    const totalCom = temReg ? comRegistrada : com(totalFat);
-    const totalComEstimado = com(totalFat);
-    const difBase = (temReg && totalComEstimado != null) ? totalComEstimado - comRegistrada : null;
+    const totalCom = com(totalFat);
+    const difBase = (temReg && totalCom != null) ? totalCom - comRegistrada : null;
     const umDoze = totalCom == null ? null : totalCom / 12;
 
     /* art. 34: 1/3 das comissoes dos TRES MESES ANTERIORES. Anteriores, sem o
      * corrente, que ainda esta aberto e puxaria a conta para baixo no dia 3. */
     const ms = mesesOrdenados(serie).filter((k) => k < mesAtual).slice(-3);
     const fat3 = ms.reduce((s, k) => s + (serie[k] || 0), 0);
-    const com3 = (comSerie && temReg)
-      ? ms.reduce((s, k) => s + (comSerie[k] || 0), 0)
-      : com(fat3);
+    const com3 = com(fat3);
     const aviso = com3 == null ? null : com3 / 3;
 
     const acerto = (umDoze == null || aviso == null) ? null : umDoze + aviso;
@@ -229,7 +234,9 @@ function calcular() {
     return {
       nome, pct: p, meta: m, serie, anos, primeiroAno, primeiraData,
       totalFat, totalCom, umDoze, aviso, acerto, fat12,
-      com12: (comSerie && temReg) ? doze.reduce((s2, k) => s2 + (comSerie[k] || 0), 0) : com(fat12),
+      com12: com(fat12),
+      comRegistrada: temReg ? comRegistrada : null,
+      vigia: (j.vigia || {})[nome] || null,
       registrada: temReg, difBase, impostos: (j.impostos || {})[nome] || 0,
       taxaEfetiva: (temReg && totalFat > 0) ? (comRegistrada / totalFat) * 100 : null,
       pedidos: (j.pedidos || {})[nome] || 0,
@@ -282,10 +289,11 @@ function renderFabrica(l, anexos) {
    * o desconto acontece fora do Mercos, no que a fabrica de fato paga.
    * Anunciar a diferenca como "efeito do imposto" seria mentira - o que ela
    * mostra, quando aparece, e que o percentual mudou ao longo do tempo. */
-  if (l.taxaEfetiva != null) {
-    const alvo = l.pct;
-    const longe = alvo != null && l.taxaEfetiva < alvo * 0.97;
-    flags.push(`<span class="flag ${longe ? 'alerta' : ''}">taxa efetiva ${l.taxaEfetiva.toFixed(2).replace('.', ',')}%${longe ? ' · cadastro diz ' + alvo + '%' : ''}</span>`);
+  if (l.taxaEfetiva != null && l.pct != null && l.taxaEfetiva < l.pct * 0.97) {
+    flags.push(`<span class="flag alerta">Mercos gravou a ${l.taxaEfetiva.toFixed(2).replace('.', ',')}% · diferença de ${curto(l.difBase)}</span>`);
+  }
+  if (l.vigia && l.vigia.cancelados) {
+    flags.push(`<span class="flag">${l.vigia.cancelados} pedidos cancelados · ${curto(l.vigia.valorCancelado)}</span>`);
   }
 
   return `<div class="fab">
@@ -318,6 +326,142 @@ function renderFabrica(l, anexos) {
       <button class="btn btn-sm" data-anexo="${esc(l.nome)}" style="margin-left:8px">Registrar documento</button>
     </div>
   </div>`;
+}
+
+
+/* ===== VIGIA =====
+ *
+ * Alertas que nascem de comparar numero com prazo de lei. Cada bloco cita o
+ * artigo e mostra a conta. Nenhum deles conclui nada: apontam onde olhar.
+ *
+ * PRAZO DO ART. 33. A lei manda a representada recusar a proposta por escrito
+ * em 15, 30, 60 ou 120 dias conforme a praca do comprador; passado o prazo sem
+ * recusa, a comissao e devida. O Mercos NAO registra recusa formal com data -
+ * o mais proximo disso e o orcamento que nunca virou pedido. Por isso a tela
+ * chama de "proposta parada", e nao de "comissao vencida": e indicio para
+ * conferir, nao prova.
+ *
+ * PRESCRICAO. Art. 44, paragrafo unico: cinco anos. O relogio corre por
+ * parcela, entao o que importa e o mes - e o que vence nos proximos 90 dias.
+ */
+function calcVigia(c) {
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const alertas = [];
+
+  /* --- 1. prescricao dos proximos 90 dias --- */
+  const limite = new Date(Date.now() - (5 * 365 - 90) * 86400000);
+  const mesLimite = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
+    .format(limite).slice(0, 7);
+  const cinco = new Date(Date.now() - 5 * 365 * 86400000);
+  const mesCinco = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
+    .format(cinco).slice(0, 7);
+
+  let venceValor = 0; const venceFab = [];
+  c.linhas.forEach((l) => {
+    if (l.pct == null) return;
+    let v = 0;
+    Object.keys(l.serie || {}).forEach((m) => {
+      if (m > mesCinco && m <= mesLimite) v += (l.serie[m] || 0) * (l.pct / 100);
+    });
+    if (v > 0) { venceValor += v; venceFab.push({ nome: l.nome, v }); }
+  });
+  if (venceValor > 0) {
+    venceFab.sort((a, b) => b.v - a.v);
+    alertas.push({
+      tipo: 'prescricao',
+      titulo: 'Prescrição chegando nos próximos 90 dias',
+      texto: `A comissão de <b>${mesCinco.split('-').reverse().join('/')}</b> a
+        <b>${mesLimite.split('-').reverse().join('/')}</b> completa cinco anos neste trimestre —
+        <b>${fmt(venceValor)}</b> no total. Maiores: ${venceFab.slice(0, 3)
+          .map((f) => esc(f.nome) + ' (' + curto(f.v) + ')').join(', ')}.
+        Se alguma dessas parcelas não foi paga, é agora ou nunca.`,
+      lei: 'Lei 4.886/65, art. 44, parágrafo único — prescreve em cinco anos.',
+    });
+  }
+
+  /* --- 2. propostas paradas alem do prazo do art. 33 --- */
+  const dias = (iso) => Math.floor((new Date(hoje) - new Date(iso)) / 86400000);
+  const paradas = [];
+  c.linhas.forEach((l) => {
+    ((l.vigia && l.vigia.abertos) || []).forEach((o) => {
+      const d = dias(o.data);
+      /* Sem saber a praca da fabrica, o corte honesto e o mais LONGO de dentro
+       * do pais: 60 dias, comprador em outro estado. Assim a tela nunca acusa
+       * antes da hora. */
+      if (d >= 60) paradas.push({ fab: l.nome, ...o, dias: d });
+    });
+  });
+  paradas.sort((a, b) => b.valor - a.valor);
+  if (paradas.length) {
+    const soma = paradas.reduce((s2, o) => s2 + o.valor, 0);
+    alertas.push({
+      tipo: 'art33',
+      titulo: `${paradas.length} propostas paradas há mais de 60 dias`,
+      texto: `Somam <b>${fmt(soma)}</b> em pedidos que entraram como orçamento e nunca viraram
+        pedido. Maiores: ${paradas.slice(0, 4).map((o) => esc(o.cliente) + ' · ' + esc(o.fab)
+          + ' · ' + curto(o.valor) + ' · ' + o.dias + ' dias').join(' | ')}.
+        O Mercos não registra recusa formal com data, então isto é <b>indício, não prova</b>:
+        vale conferir se a fábrica recusou por escrito dentro do prazo.`,
+      lei: 'Lei 4.886/65, art. 33 — 15, 30, 60 ou 120 dias conforme a praça do comprador. Sem recusa escrita no prazo, a comissão é devida.',
+    });
+  }
+
+  /* --- 3. queda da media de seis meses --- */
+  const caindo = c.linhas.filter((l) => l.varMedia != null && l.varMedia <= -0.15 && l.fat12 > 0);
+  if (caindo.length) {
+    caindo.sort((a, b) => a.varMedia - b.varMedia);
+    alertas.push({
+      tipo: 'media',
+      titulo: `${caindo.length} fábrica${caindo.length > 1 ? 's' : ''} com a média dos seis meses em queda`,
+      texto: `${caindo.slice(0, 5).map((l) => '<b>' + esc(l.nome) + '</b> ' + Math.round(l.varMedia * 100) + '%').join(' · ')}.
+        Queda por si só não é ilegal — mercado oscila. Vira assunto jurídico quando vem de ato da
+        representada: zona reduzida, preço inviável, mix cortado.`,
+      lei: 'Lei 4.886/65, art. 32, § 7º — vedadas alterações que reduzam a média dos últimos seis meses. E art. 36, "a" e "c", que fazem disso justa causa para o representante rescindir.',
+    });
+  }
+
+  /* --- 4. fabrica com historico que parou --- */
+  const paradasFab = c.linhas.filter((l) => l.totalFat > 50000 && l.fat12 === 0);
+  if (paradasFab.length) {
+    paradasFab.sort((a, b) => b.totalFat - a.totalFat);
+    alertas.push({
+      tipo: 'asfixia',
+      titulo: `${paradasFab.length} fábrica${paradasFab.length > 1 ? 's' : ''} sem faturar nos últimos 12 meses`,
+      texto: `${paradasFab.slice(0, 5).map((l) => '<b>' + esc(l.nome) + '</b> (histórico de ' + curto(l.totalFat) + ')').join(' · ')}.
+        Se a representação não foi rescindida e simplesmente parou de dar retorno, existe figura
+        jurídica para isso — não é só cliente que sumiu.`,
+      lei: 'Código Civil, art. 715 — indenização se o proponente, sem justa causa, cessar o atendimento das propostas ou reduzi-lo a ponto de tornar antieconômica a continuação do contrato.',
+    });
+  }
+
+  /* --- 5. base de calculo --- */
+  if (c.descontamST || c.descontamIPI) {
+    alertas.push({
+      tipo: 'base',
+      titulo: 'Imposto saindo da base da comissão',
+      texto: `<b>${c.descontamST}</b> fábricas descontam ST e <b>${c.descontamIPI}</b> descontam IPI
+        antes de calcular sua comissão, segundo o cadastro delas no Mercos. O campo de comissão do
+        Mercos <b>não</b> reflete esse desconto — ele é faturamento × percentual. Ou seja: o que
+        entra na conta é menor do que esta tela mostra, e a diferença só aparece no informe de
+        rendimentos.`,
+      lei: 'Lei 4.886/65, art. 32, § 4º — as comissões deverão ser calculadas pelo valor total das mercadorias. Há decisão nos dois sentidos sobre excluir imposto da base: é questão em aberto, não conclusão.',
+    });
+  }
+
+  return alertas;
+}
+
+function renderVigia(c) {
+  const A = calcVigia(c);
+  if (!A.length) return '';
+  return `<h3>Vigia</h3>
+  <div class="sub">Alertas gerados da comparação entre os seus números e os prazos da lei.
+    Cada um cita o artigo e mostra a conta. Nenhum conclui nada — apontam onde olhar.</div>
+  ${A.map((a) => `<div class="fab">
+    <div class="nome">${a.titulo}</div>
+    <div style="font-size:13.5px;line-height:1.6;margin-top:6px">${a.texto}</div>
+    <div class="anexo" style="border-top-style:dashed">${esc(a.lei)}</div>
+  </div>`).join('')}`;
 }
 
 function render() {
@@ -381,6 +525,8 @@ function render() {
     pedido no Mercos enquanto o contrato não for anexado — o que <b>subestima</b> quem começou
     antes do sistema. As barrinhas são os últimos 24 meses de faturamento.</div>
   ${c.linhas.map((l) => renderFabrica(l, anexos)).join('')}
+
+  ${renderVigia(c)}
 
   <h3>Base de cálculo da comissão</h3>
   <div class="sub">O art. 32, § 4º da Lei 4.886/65 diz que as comissões devem ser calculadas
