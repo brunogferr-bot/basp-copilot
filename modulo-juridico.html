@@ -172,7 +172,7 @@ function calcular() {
   const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   const mesAtual = hoje.slice(0, 7);
 
-  const linhas = nomes.map((nome) => {
+  let linhas = nomes.map((nome) => {
     const p = pct[nome];
     const m = meta[nome] || {};
     const serie = j.mensal[nome] || {};
@@ -246,10 +246,22 @@ function calcular() {
 
   linhas.sort((a, b) => (b.acerto || 0) - (a.acerto || 0));
 
+  /* SO FABRICAS ATIVAS - decisao do Bruno em 14/08/2026:
+   * "as fabricas que nao estao listadas como ativa ja nao fazem parte do
+   * escritorio, ja fiz acerto com todas".
+   * Fabrica encerrada com acerto pago nao tem 1/12 a receber, nao tem prazo do
+   * art. 33 correndo e nao interessa no alerta de queda de media. Deixa-las na
+   * conta enchia a tela de 32 "quedas" que eram so representacoes que
+   * acabaram - ruido que esconde o que importa.
+   * Se a lista de ativas nao carregar, a tela avisa em vez de fingir que
+   * filtrou: numero errado sem aviso e pior que numero faltando. */
   const ativas = new Set(state.ativas || []);
-  const somaAcerto = linhas
-    .filter((l) => !ativas.size || ativas.has(l.nome))
-    .reduce((s, l) => s + (l.acerto || 0), 0);
+  const semFiltro = !ativas.size;
+  const todasLinhas = linhas;
+  if (!semFiltro) linhas = linhas.filter((l) => ativas.has(l.nome));
+  const encerradas = todasLinhas.length - linhas.length;
+
+  const somaAcerto = linhas.reduce((s, l) => s + (l.acerto || 0), 0);
 
   return {
     linhas,
@@ -259,6 +271,7 @@ function calcular() {
     descontamST: linhas.filter((l) => l.meta.descontaST).length,
     descontamIPI: linhas.filter((l) => l.meta.descontaIPI).length,
     atualizadoEm: j.atualizadoEm || null,
+    semFiltro, encerradas,
   };
 }
 
@@ -420,19 +433,12 @@ function calcVigia(c) {
     });
   }
 
-  /* --- 4. fabrica com historico que parou --- */
-  const paradasFab = c.linhas.filter((l) => l.totalFat > 50000 && l.fat12 === 0);
-  if (paradasFab.length) {
-    paradasFab.sort((a, b) => b.totalFat - a.totalFat);
-    alertas.push({
-      tipo: 'asfixia',
-      titulo: `${paradasFab.length} fábrica${paradasFab.length > 1 ? 's' : ''} sem faturar nos últimos 12 meses`,
-      texto: `${paradasFab.slice(0, 5).map((l) => '<b>' + esc(l.nome) + '</b> (histórico de ' + curto(l.totalFat) + ')').join(' · ')}.
-        Se a representação não foi rescindida e simplesmente parou de dar retorno, existe figura
-        jurídica para isso — não é só cliente que sumiu.`,
-      lei: 'Código Civil, art. 715 — indenização se o proponente, sem justa causa, cessar o atendimento das propostas ou reduzi-lo a ponto de tornar antieconômica a continuação do contrato.',
-    });
-  }
+  /* O alerta de "fabrica parada" (CC art. 715) saiu daqui.
+   * Ele so faz sentido para representacao VIVA que parou de dar retorno. Como
+   * a tela agora mostra so fabricas ativas - e as encerradas ja tiveram acerto
+   * pago - ele acusaria sempre em falso. Se um dia uma ativa comecar a definhar,
+   * quem avisa e o alerta de queda de media, que olha o mesmo fenomeno mais
+   * cedo. */
 
   /* --- 5. base de calculo --- */
   if (c.descontamST || c.descontamIPI) {
@@ -504,6 +510,8 @@ function render() {
     Nada nesta tela serve para cobrança antes disso.
   </div>
 
+  ${c.semFiltro ? '<div class="tarja"><b>Não consegui carregar a lista de fábricas ativas.</b> Esta tela está mostrando todas as representadas que já faturaram, inclusive as encerradas e já acertadas. Recarregue para filtrar.</div>' : ''}
+
   <div class="cards">
     <div class="kpi"><div class="rot">Acerto total estimado</div>
       <div class="val">${curto(c.somaAcerto)}</div>
@@ -520,7 +528,7 @@ function render() {
   </div>
 
   <h3>Se a fábrica desligar hoje</h3>
-  <div class="sub">Acerto = 1/12 da comissão de toda a representação (art. 27, "j") + aviso prévio
+  <div class="sub">${c.encerradas ? '<b>' + c.encerradas + ' representações encerradas ficaram de fora</b> — o acerto delas já foi feito. ' : ''}Acerto = 1/12 da comissão de toda a representação (art. 27, "j") + aviso prévio
     de 1/3 das comissões dos três meses anteriores (art. 34). A data de início vem do primeiro
     pedido no Mercos enquanto o contrato não for anexado — o que <b>subestima</b> quem começou
     antes do sistema. As barrinhas são os últimos 24 meses de faturamento.</div>
