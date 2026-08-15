@@ -67,6 +67,20 @@
 
   .anexo{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--ink-soft)}
   .vazio{padding:28px;text-align:center;color:var(--ink-soft)}
+
+  /* Contrato revisado. O que a fabrica escreveu fica em texto normal; o que
+   * nos incluimos fica em italico e com barra lateral - decisao do Bruno em
+   * 15/08/2026, para nao restar duvida sobre a autoria de cada linha. */
+  .contrato{border:1px solid var(--border);border-radius:10px;background:var(--card);
+    padding:16px;margin-top:10px;font-size:13.5px;line-height:1.7;white-space:pre-wrap}
+  .contrato .orig{margin:0 0 12px}
+  .contrato .novo{margin:0 0 12px;font-style:italic;padding-left:12px;
+    border-left:3px solid var(--gold);color:var(--ink)}
+  .contrato .novo small{display:block;font-style:normal;font-size:11px;color:var(--ink-soft);margin-top:3px}
+  textarea.campo{width:100%;min-height:150px;padding:11px;border:1px solid var(--border);
+    border-radius:9px;font-family:inherit;font-size:13.5px;line-height:1.6;background:var(--card);color:var(--ink)}
+  .incons{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+    font-family:inherit;font-size:13px;background:var(--card);color:var(--ink);margin-top:6px}
 </style>
 </head>
 <body>
@@ -602,6 +616,170 @@ function calcEncerramento(l) {
   return { e, p, minimo, ofertado, difIndeniz, difAviso, dif: ofertado - minimo };
 }
 
+
+/* =====================================================================
+ * REVISAO DO CONTRATO DE ENCERRAMENTO
+ *
+ * O Bruno cola o termo que a fabrica mandou; a tela devolve o mesmo texto com
+ * as correcoes inseridas EM ITALICO, para ficar visivel o que nao foi escrito
+ * por eles.
+ *
+ * COMO FUNCIONA. Nao e leitura de contrato: e conferencia contra uma lista de
+ * pontos onde a Lei 4.886/65 costuma ser contrariada. Duas familias de regra:
+ *
+ *   PRESENTE - a clausula existe e conflita com a lei. A correcao entra logo
+ *              abaixo do paragrafo em que apareceu.
+ *   AUSENTE  - a clausula que protege o representante nao esta la. A inclusao
+ *              entra no fim, numa secao propria.
+ *
+ * O QUE ISTO NAO E. Nao le contrato inteiro, nao entende contexto e nao
+ * substitui advogado. Uma clausula pode citar "quitacao" de forma inofensiva e
+ * a regra vai marcar mesmo assim - por isso cada insercao vem com o artigo ao
+ * lado, para o Bruno julgar. Falso positivo aqui custa uma leitura a mais;
+ * falso negativo custa dinheiro. A tela erra para o lado seguro.
+ * ===================================================================== */
+
+const REGRAS_CONTRATO = [
+  {
+    id: 'quitacao',
+    quando: 'presente',
+    re: /quita[çc][ãa]o\s+(ampla|geral|plena|irrevog|irrestrita)|nada\s+mais\s+(a|ter[áa])\s*(que)?\s*reclamar|quita[çc][ãa]o\s+de\s+todo/i,
+    titulo: 'Quitação ampla e geral',
+    porque: 'Quitação genérica encerra a discussão sobre comissão atrasada, diferença de base de cálculo e tudo que não foi conferido.',
+    texto: 'A quitação ora outorgada restringe-se exclusivamente às verbas discriminadas e '
+      + 'efetivamente pagas neste instrumento, não alcançando comissões vencidas e não pagas, '
+      + 'diferenças decorrentes da base de cálculo prevista no art. 32, § 4º, da Lei 4.886/65, '
+      + 'nem quaisquer valores não expressamente mencionados.',
+    lei: 'Lei 4.886/65 — a quitação vale pelo que descreve',
+  },
+  {
+    id: 'delcredere',
+    quando: 'presente',
+    re: /del\s*credere|estorn\w+|respons[áa]vel\s+pela\s+(solv[êe]ncia|inadimpl)|inadimpl\w+\s+do\s+cliente/i,
+    titulo: 'Estorno de comissão ou responsabilidade pelo cliente',
+    porque: 'Cláusula que devolve comissão por calote da loja é del credere disfarçado, e a lei proíbe.',
+    texto: 'Nos termos do art. 43 da Lei 4.886/65, é vedada a inclusão de cláusula del credere. '
+      + 'O representante não responde pela solvência dos clientes, ressalvada exclusivamente a '
+      + 'hipótese do art. 33, § 1º, mediante comprovação documental da insolvência do comprador.',
+    lei: 'Lei 4.886/65, arts. 43 e 33, § 1º',
+  },
+  {
+    id: 'foro',
+    quando: 'presente',
+    re: /foro\s+d[ao]\s+comarca|elegem\s+o\s+foro|foro\s+de\s+elei[çc][ãa]o/i,
+    titulo: 'Foro de eleição',
+    porque: 'Cláusula que joga a discussão para a comarca da fábrica contraria a regra protetiva.',
+    texto: 'Fica eleito o foro do domicílio do representante comercial para dirimir as controvérsias '
+      + 'decorrentes deste instrumento, nos termos do art. 39 da Lei 4.886/65.',
+    lei: 'Lei 4.886/65, art. 39',
+  },
+  {
+    id: 'renuncia',
+    quando: 'presente',
+    re: /ren[úu]ncia|renunci\w+|abre\s+m[ãa]o|desiste\s+de\s+qualquer/i,
+    titulo: 'Renúncia a direitos',
+    porque: 'A lei da representação é protetiva; renúncia genérica a direitos dela tende a não valer.',
+    texto: 'Não há renúncia a direitos assegurados pela Lei 4.886/65, cujas disposições são de '
+      + 'natureza protetiva do representante comercial.',
+    lei: 'Lei 4.886/65',
+  },
+  {
+    id: 'impostos',
+    quando: 'presente',
+    re: /IPI|substitui[çc][ãa]o\s+tribut|\bICMS-ST\b|dedu[çc][ãa]o\s+de\s+imposto/i,
+    titulo: 'Imposto saindo da base da comissão',
+    porque: 'A lei manda calcular sobre o valor total das mercadorias.',
+    texto: 'As comissões devidas são calculadas sobre o valor total das mercadorias, nos termos do '
+      + 'art. 32, § 4º, da Lei 4.886/65, ressalvado o direito do representante de discutir '
+      + 'administrativa ou judicialmente as deduções praticadas ao longo do contrato.',
+    lei: 'Lei 4.886/65, art. 32, § 4º',
+  },
+  {
+    id: 'confidencial',
+    quando: 'presente',
+    re: /n[ãa]o\s*[- ]?concorr[êe]ncia|n[ãa]o\s+competir|exclusividade\s+ap[óo]s|ap[óo]s\s+o\s+t[ée]rmino.{0,40}n[ãa]o\s+poder[áa]/i,
+    titulo: 'Não concorrência depois do fim',
+    porque: 'Restringir sua atuação depois do encerramento, sem contrapartida financeira, limita seu ganha-pão.',
+    texto: 'Eventual obrigação de não concorrência posterior ao término da representação depende de '
+      + 'prazo determinado, delimitação de território e contrapartida financeira específica, '
+      + 'ausentes as quais a restrição não subsiste.',
+    lei: 'Princípio geral — restrição sem contrapartida',
+  },
+  {
+    id: 'indenizacao',
+    quando: 'ausente',
+    re: /indeniza[çc][ãa]o|1\/12|um\s+doze\s+avos/i,
+    titulo: 'Indenização do art. 27, "j" não mencionada',
+    porque: 'O termo não trata da indenização mínima de 1/12 de toda a representação.',
+    texto: 'A título de indenização pela rescisão, nos termos do art. 27, alínea "j", da Lei '
+      + '4.886/65, a representada pagará ao representante a importância de R$ {UMDOZE}, '
+      + 'correspondente a 1/12 do total da retribuição auferida durante todo o tempo em que '
+      + 'exerceu a representação.',
+    lei: 'Lei 4.886/65, art. 27, "j"',
+  },
+  {
+    id: 'aviso',
+    quando: 'ausente',
+    re: /aviso\s*pr[ée]vio|pr[ée]-?aviso/i,
+    titulo: 'Aviso prévio não mencionado',
+    porque: 'O termo não trata do aviso prévio nem da indenização substitutiva.',
+    texto: 'Não concedido o aviso prévio de 30 dias, a representada pagará a importância de '
+      + 'R$ {AVISO}, equivalente a 1/3 das comissões auferidas nos três meses anteriores, '
+      + 'nos termos do art. 34 da Lei 4.886/65.',
+    lei: 'Lei 4.886/65, art. 34',
+  },
+  {
+    id: 'carteira',
+    quando: 'ausente',
+    re: /pedidos?\s+em\s+carteira|em\s+fase\s+de\s+execu[çc][ãa]o|pedidos?\s+pendentes/i,
+    titulo: 'Pedidos em carteira não mencionados',
+    porque: 'Pedidos já colocados e ainda não faturados continuam gerando comissão.',
+    texto: 'As comissões relativas a pedidos em carteira ou em fase de execução e recebimento '
+      + 'vencem na data da rescisão, nos termos do art. 32, § 5º, da Lei 4.886/65, e serão '
+      + 'pagas independentemente do faturamento posterior.',
+    lei: 'Lei 4.886/65, art. 32, § 5º',
+  },
+  {
+    id: 'prazopag',
+    quando: 'ausente',
+    re: /at[ée]\s+o\s+dia\s+15|prazo\s+(de|para)\s+pagamento|corre[çc][ãa]o\s+monet[áa]ria/i,
+    titulo: 'Prazo de pagamento e correção não definidos',
+    porque: 'Sem prazo escrito, o pagamento fica ao arbítrio da fábrica.',
+    texto: 'O pagamento das verbas ora ajustadas ocorrerá até o dia 15 do mês subsequente, '
+      + 'incidindo correção monetária em caso de atraso, nos termos do art. 32, §§ 1º e 2º, '
+      + 'da Lei 4.886/65.',
+    lei: 'Lei 4.886/65, art. 32, §§ 1º e 2º',
+  },
+];
+
+function revisarContrato(texto, l) {
+  const paras = String(texto || '').split(/\n\s*\n/);
+  const umDoze = fmt(l.umDoze).replace('R$ ', '');
+  const aviso = fmt(l.aviso).replace('R$ ', '');
+  const preencher = (t) => t.replace('{UMDOZE}', umDoze).replace('{AVISO}', aviso);
+
+  const achados = [];
+  const saida = [];
+
+  paras.forEach((par) => {
+    saida.push({ tipo: 'orig', texto: par });
+    REGRAS_CONTRATO.filter((r) => r.quando === 'presente').forEach((r) => {
+      if (!r.re.test(par)) return;
+      if (achados.some((a) => a.id === r.id)) return;   // uma vez por regra
+      achados.push({ ...r, onde: 'no texto' });
+      saida.push({ tipo: 'novo', texto: preencher(r.texto), regra: r });
+    });
+  });
+
+  const ausentes = REGRAS_CONTRATO.filter((r) => r.quando === 'ausente' && !r.re.test(texto));
+  ausentes.forEach((r) => {
+    achados.push({ ...r, onde: 'faltando' });
+    saida.push({ tipo: 'novo', texto: preencher(r.texto), regra: r, acrescentada: true });
+  });
+
+  return { saida, achados, ausentes: ausentes.length };
+}
+
 function renderEncerramento() {
   const c = calcular();
   const l = c && c.linhas.find((x) => x.nome === state.fabricaEnc);
@@ -636,7 +814,14 @@ function renderEncerramento() {
         <div class="anexo" style="border-top-style:dashed">${esc(cd.lei)}</div>
       </span>
     </label>
+    <input class="incons" data-incons="${i}" placeholder="Inconsistência encontrada neste item — o que precisa ser corrigido"
+      value="${esc((e.inconsistencias && e.inconsistencias[i]) || '')}">
   </div>`).join('')}
+  ${(() => {
+    const abertas = Object.keys(e.inconsistencias || {}).filter((k) => (e.inconsistencias[k] || '').trim());
+    return abertas.length ? `<div class="tarja"><b>${abertas.length} inconsistência(s) anotada(s)</b> —
+      resolva antes de assinar: ${abertas.map((k) => esc(CUIDADOS[k] ? CUIDADOS[k].t : k)).join(' · ')}.</div>` : '';
+  })()}
 
   <h3>2. O cálculo</h3>
   <div class="sub">Fórmula aberta, para você conferir na mão.</div>
@@ -698,7 +883,40 @@ function renderEncerramento() {
       <b>${r.data.split('-').reverse().join('/')}</b> — proposta ${fmt(r.total)}
       (${r.dif >= 0 ? '+' : ''}${fmt(r.dif)} vs mínimo)${r.obs ? ' · ' + esc(r.obs) : ''}
     </div>`).join('')}
-  </div>`;
+  </div>
+
+  <h3>5. O contrato de encerramento</h3>
+  <div class="sub">Cole o termo que a fábrica enviou. A revisão devolve o mesmo texto com as
+    correções inseridas <i>em itálico</i> — tudo que estiver em itálico <b>não foi escrito por eles</b>.</div>
+  <div class="fab">
+    <textarea class="campo" id="contrato-texto" placeholder="Cole aqui o contrato de encerramento enviado pela fábrica">${esc(e.contrato || '')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" id="btn-revisar">Revisar contrato</button>
+      ${e.revisado ? '<button class="btn" id="btn-copiar">Copiar revisão</button>' : ''}
+    </div>
+    <div class="anexo">Conferência contra a Lei 4.886/65 por lista de pontos, não leitura jurídica.
+      Pode marcar cláusula inofensiva — cada inserção vem com o artigo ao lado para você julgar.
+      <b>Não substitui advogado.</b></div>
+  </div>
+  ${e.revisado ? renderRevisao(e.revisado) : ''}`;
+}
+
+/* Dois blocos: o resumo do que foi mexido e o contrato reescrito. O resumo vem
+ * antes porque e o que se le com pressa; o texto completo e para conferir e
+ * copiar. */
+function renderRevisao(rev) {
+  const ins = rev.saida.filter((x) => x.tipo === 'novo');
+  return `<div class="fab">
+    <div class="nome">${ins.length} inserção(ões) sugerida(s)</div>
+    <div class="sub" style="margin:6px 0 0">${rev.achados.map((a) => `<div style="padding:7px 0;border-top:1px dashed var(--border)">
+      <b>${esc(a.titulo)}</b> · ${a.onde === 'faltando' ? 'não constava' : 'encontrado no texto'}<br>
+      ${esc(a.porque)}<br><span class="neutro">${esc(a.lei)}</span>
+    </div>`).join('')}</div>
+  </div>
+
+  <div class="contrato" id="contrato-revisado">${rev.saida.map((x) => (x.tipo === 'orig'
+    ? `<p class="orig">${esc(x.texto)}</p>`
+    : `<p class="novo">${esc(x.texto)}<small>${x.acrescentada ? 'Cláusula acrescentada' : 'Correção inserida'} · ${esc(x.regra.lei)}</small></p>`)).join('')}</div>`;
 }
 
 
@@ -755,6 +973,40 @@ function ligarEncerramento() {
 
   const re = document.getElementById('btn-reabrir');
   if (re) re.addEventListener('click', () => { e.status = 'aberto'; salvarEncerramentos(); render(); });
+
+  document.querySelectorAll('[data-incons]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (!e.inconsistencias) e.inconsistencias = {};
+      e.inconsistencias[el.getAttribute('data-incons')] = el.value.trim();
+      salvarEncerramentos();
+      render();
+    });
+  });
+
+  const rev = document.getElementById('btn-revisar');
+  if (rev) rev.addEventListener('click', () => {
+    const ta = document.getElementById('contrato-texto');
+    const txt = (ta.value || '').trim();
+    if (!txt) { alert('Cole o texto do contrato antes de revisar.'); return; }
+    if (txt.length > 80000) { alert('Contrato muito longo. Cole por partes.'); return; }
+    const c = calcular();
+    const l = c.linhas.find((x) => x.nome === nome);
+    e.contrato = txt;
+    e.revisado = revisarContrato(txt, l);
+    e.revisadoEm = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    salvarEncerramentos();
+    render();
+  });
+
+  const cop = document.getElementById('btn-copiar');
+  if (cop) cop.addEventListener('click', () => {
+    const el = document.getElementById('contrato-revisado');
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText).then(
+      () => alert('Revisão copiada. O que estava em itálico virou texto comum — marque no editor antes de enviar.'),
+      () => alert('Não consegui copiar. Selecione o texto na tela.')
+    );
+  });
 }
 
 function render() {
