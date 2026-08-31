@@ -488,7 +488,45 @@ function renderTopo() {
  */
 function idadeDoDado() {
   const m = state.meta || {};
-  const iso = m.lastSync || null;
+
+  /* ===== POR QUE ESTE SELO MUDOU EM 31/08/2026 =====
+   *
+   * Ele lia `meta.lastSync` - a hora da ULTIMA TENTATIVA de sincronizar. Só
+   * que tentar nao e conseguir. Em 22/08 o token do GitHub expirou e a API
+   * parou de GRAVAR: a extensao continuou buscando no Mercos a cada 10
+   * minutos, o `lastSync` continuou avancando na memoria do servidor, e o
+   * selo seguiu dizendo "agora mesmo" por NOVE DIAS enquanto a tela mostrava
+   * numeros de 22/08. R$ 256 mil de venda invisiveis.
+   *
+   * A licao: o selo tem que medir a idade do NUMERO QUE ESTA NA TELA, nao a
+   * idade da ultima tentativa. Entao a fonte passa a ser
+   * `indicadores.atualizadoEm` - o instante em que o dado exibido foi de fato
+   * gravado.
+   *
+   * E a distancia entre os dois vira diagnostico: se o sistema tenta ha horas
+   * e nao grava, isso tem nome e aparece em vermelho. */
+  const gravado = (state.indic && state.indic.atualizadoEm) || null;
+  const tentado = m.lastSync || null;
+
+  if (gravado && tentado) {
+    const atraso = new Date(tentado).getTime() - new Date(gravado).getTime();
+    if (atraso > 3 * 3600 * 1000) {
+      const h = Math.floor(atraso / 3600000);
+      const d = Math.floor(h / 24);
+      const quanto = d >= 1 ? (d + (d > 1 ? ' dias' : ' dia')) : (h + 'h');
+      const q = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      }).format(new Date(gravado));
+      return {
+        nivel: 'alerta',
+        texto: '<b>Sincronizando mas não gravando há ' + quanto + '.</b> Os números abaixo são de '
+          + q + ' e não avançam. Causa quase sempre a mesma: credencial do servidor expirada.',
+        quando: new Date(gravado),
+      };
+    }
+  }
+
+  const iso = gravado || tentado;
   if (!iso) return { nivel: 'alerta', texto: 'Nunca sincronizado com o Mercos.', quando: null };
 
   const quando = new Date(iso);
