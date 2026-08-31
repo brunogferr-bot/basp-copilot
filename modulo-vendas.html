@@ -637,7 +637,7 @@ function calcMes() {
   /* Ativas: as que a propria analise ja mostra com faturamento nos 12 meses. */
   const ativas = new Set(
     ((state.dados && state.dados.fabricas) || [])
-      .filter((f) => (f.total12 || 0) > 0)
+      .filter((f) => !f.arquivada && (f.total12 || 0) > 0)
       .map((f) => chaveFab(f.nome))
   );
 
