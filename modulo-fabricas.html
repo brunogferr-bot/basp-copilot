@@ -173,6 +173,85 @@ function textoVar(f) {
  * princípio do autor resumido em uma linha. Nao invento frase de ninguem.
  * ===================================================================== */
 
+
+/* ===== BANCO DE PENSADORES =====
+ * Antes disto, cada situacao (queda, carteira parada, desconto, etc)
+ * sempre puxava o mesmo autor e a mesma frase para o mesmo tema. Aqui
+ * embaixo ficam 3-4 alternativas reais e verificadas por tema (pesquisadas,
+ * nao inventadas). A escolha roda de forma deterministica por fabrica/mes:
+ * nao e aleatoria a cada render, e nao repete sempre o mesmo nome para a
+ * mesma situacao. Mesmo banco usado em modulo-vendas.html. */
+function hashSemente(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+const PENSADORES = {
+  diagnostico: [
+    { autor: 'Jack Welch', frase: '"Encare a realidade como ela é, não como você gostaria que fosse."', contexto: 'GE. Diagnóstico honesto antes de qualquer plano de ação.' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: sem entender onde a receita realmente nasce, toda decisão de gestão vira palpite.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: antes de cobrar um indicador, perguntar o que a equipe faria diferente por causa dele.' },
+    { autor: 'Flávio Augusto', frase: null, contexto: 'Geração de Valor: encarar o problema de frente custa caro no curto prazo e compensa no longo prazo.' },
+  ],
+  carteiraExistente: [
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: crescer dentro da carteira que já se tem é o caminho mais barato de crescimento.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: positivar carteira sem cuidar do mix esconde quem parou de comprar atrás de quem comprou pouco.' },
+    { autor: 'Jeffrey Gitomer', frase: null, contexto: 'Little Red Book of Selling: manter atenção em quem já compra rende mais que sempre perseguir cliente novo.' },
+    { autor: 'Zig Ziglar', frase: null, contexto: 'Princípio recorrente: cliente não compra de quem não confia mais — recuperar começa por reconstruir confiança, não desconto.' },
+  ],
+  perguntar: [
+    { autor: 'Neil Rackham', frase: null, contexto: 'SPIN Selling: em venda complexa, quem investiga com perguntas vende mais que quem argumenta.' },
+    { autor: 'Thiago Concer', frase: null, contexto: 'Vendas não ocorrem por acaso: pergunta é a ferramenta mais poderosa porque o cliente compra pelas razões dele, não pelas do vendedor.' },
+    { autor: 'Dale Carnegie', frase: null, contexto: 'Como Fazer Amigos: perguntar com interesse genuíno sobre o negócio do outro abre mais portas que qualquer argumento pronto.' },
+  ],
+  ensinar: [
+    { autor: 'Matthew Dixon e Brent Adamson', frase: null, contexto: 'The Challenger Sale: quem ensina, adapta o discurso ao cliente e assume o controle da conversa costuma vender mais.' },
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: oportunidade parada é pipeline vazio disfarçado de sorte ruim.' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Vendas 3.0: o vendedor precisa se reposicionar de tirador de pedido para quem enxerga a oportunidade que o cliente ainda não viu.' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: oportunidade previsível nasce de processo de entrada estruturado, não de lembrança de contato antigo.' },
+  ],
+  medirRepetir: [
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: medir existe para descobrir o que funcionou e repetir, não para decorar número.' },
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: elite de vendas acompanha os próprios números como atleta de alto rendimento acompanha estatística.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: acompanhar de perto é o que revela, com dado, onde o crescimento é real.' },
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR: o clube dos que batiam a cota existia para separar, com número, quem performa de quem só está ocupado.' },
+  ],
+  territorio: [
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR, fim do século 19: vender é gestão de praça — território, cota e roteiro de visita, não sorte.' },
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: pipeline cheio depende de manter o roteiro ativo mesmo quando a carteira parece resolvida.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: praça em queda costuma aparecer primeiro na frequência de visita, antes de aparecer no faturamento.' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: praça sem processo de cobertura repete o erro clássico de esperar o cliente aparecer sozinho.' },
+  ],
+  prospeccao: [
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: prospecção é atividade diária, não campanha de emergência quando o funil esvazia.' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: depender de indicação e contato antigo é o erro clássico que tira o gestor de vendas do cargo.' },
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR: território sem prospecção vira território apenas administrado, nunca conquistado de novo.' },
+  ],
+  concentracao: [
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: receita previsível vem de processo de entrada constante, não de poucos contratos grandes.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: carteira concentrada em poucos nomes é indicador de risco antes de ser indicador de sucesso.' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: negócio que não gera negócio novo não se resolve cortando custo, se resolve diversificando fonte de receita.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: proteger poucos clientes grandes sem cultivar os médios é a forma mais comum de fragilizar a carteira.' },
+  ],
+  desconto: [
+    { autor: 'Thiago Concer', frase: null, contexto: 'Vendas não ocorrem por acaso: desconto é a saída de quem não construiu valor antes de falar preço.' },
+    { autor: 'Jeffrey Gitomer', frase: null, contexto: 'Little Red Book of Selling: quem vende ideia não depende de preço; quem só fala preço já ficou sem argumento.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'Chega de Desconto!: desconto dado sem critério vira expectativa do cliente e hábito da equipe, difícil de reverter depois.' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Vendas 3.0: reposicionar a venda em valor, não em preço, separa o vendedor consultor do tirador de pedido.' },
+  ],
+  eloHumano: [
+    { autor: 'Jeffrey Gitomer', frase: '"As pessoas não gostam que vendam para elas, mas adoram comprar."', contexto: 'Little Red Book of Selling. Complementado por Dale Carnegie: interesse sincero pelo negócio do outro abre mais portas que técnica.' },
+    { autor: 'Dale Carnegie', frase: null, contexto: 'Como Fazer Amigos e Influenciar Pessoas: interesse genuíno pelo negócio do outro abre mais portas em dois meses do que tentar ser interessante em dois anos.' },
+    { autor: 'Zig Ziglar', frase: null, contexto: 'Princípio recorrente: se o cliente gosta de você ele escuta, se confia ele compra — a venda nasce da confiança antes da técnica.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: vendedor fiel gera cliente fiel — o vínculo humano sustenta a recompra muito depois do argumento técnico ser esquecido.' },
+  ],
+};
+function pensadorA(tema, semente) {
+  const banco = PENSADORES[tema];
+  const p = banco[hashSemente(String(semente)) % banco.length];
+  return { autor: p.autor, frase: p.frase, contexto: p.contexto };
+}
+
 function planoDaFabrica(f) {
   const acoes = [];
   const perdidos = f.perdidos || [];
@@ -194,9 +273,7 @@ function planoDaFabrica(f) {
         + `identifique <b>onde exatamente</b> o dinheiro sumiu: são `
         + `${perdidos.length} loja(s) que pararam e ${quedas.length} que reduziram forte. `
         + `Isso dá ${fmtMoney(perdaReais)} de perda rastreável. O resto é hipótese.`,
-      autor: 'Jack Welch',
-      frase: '"Encare a realidade como ela é, não como você gostaria que fosse."',
-      contexto: 'GE. Diagnóstico honesto antes de plano de ação.',
+      ...pensadorA('diagnostico', f.nome + ':1'),
     });
   }
 
@@ -209,9 +286,7 @@ function planoDaFabrica(f) {
       texto: `Maiores: ${esc(top)}. Estas lojas já conheciam o produto, já tinham `
         + `mostruário e já tinham vendido. Recuperar cliente que parou custa uma fração `
         + `de abrir cliente novo — e a conversa começa de um lugar melhor: "sumiu por quê?".`,
-      autor: 'Marcelo Caetano',
-      frase: null,
-      contexto: 'Gestão de carteira: crescer dentro da carteira que já se tem é o caminho mais barato de crescimento.',
+      ...pensadorA('carteiraExistente', f.nome + ':2'),
     });
   }
 
@@ -224,9 +299,7 @@ function planoDaFabrica(f) {
         + 'substituiu parte do mix. Não chegue defendendo a fábrica. Pergunte o que mudou '
         + 'na exposição, o que entrou no lugar e o que o consumidor final passou a pedir. '
         + 'Deixe o lojista dimensionar o próprio problema em voz alta.',
-      autor: 'Neil Rackham',
-      frase: null,
-      contexto: 'SPIN Selling: em venda complexa, perguntas de implicação vendem mais que argumentos.',
+      ...pensadorA('perguntar', f.nome + ':3'),
     });
   }
 
@@ -240,9 +313,7 @@ function planoDaFabrica(f) {
         + 'falta a conversa. Não chegue com catálogo: chegue com o que você aprendeu vendendo '
         + 'esta fábrica em lojas parecidas na mesma praça. Informação que o lojista não tem vale '
         + 'mais que desconto.',
-      autor: 'Matthew Dixon e Brent Adamson',
-      frase: null,
-      contexto: 'The Challenger Sale: o vendedor que mais vende é o que ensina algo novo sobre o negócio do cliente.',
+      ...pensadorA('ensinar', f.nome + ':4'),
     });
   }
 
@@ -256,9 +327,7 @@ function planoDaFabrica(f) {
         + 'Antes de tentar consertar a praça ruim, descubra o que está sendo feito de diferente '
         + 'aqui — que produto puxa, que argumento pega, que prazo destrava — e leve isso '
         + 'para as outras cidades. Padrão que funciona se copia.',
-      autor: 'Raul Candeloro',
-      frase: null,
-      contexto: 'Gestão de vendas por indicadores: medir para descobrir o que repetir.',
+      ...pensadorA('medirRepetir', f.nome + ':5'),
     });
   }
 
@@ -272,9 +341,7 @@ function planoDaFabrica(f) {
         + `${c.perdidos.length} loja(s) pararam nesta praça. Uma cidade inteira caindo raramente `
         + 'é coincidência de lojistas — costuma ser concorrente novo, ruptura de entrega ou '
         + 'mostruário envelhecido. Vá até lá com hipótese, não com planilha.',
-      autor: 'John H. Patterson',
-      frase: null,
-      contexto: 'NCR, fim do século 19: criou território, cota e roteiro de visita — vender é gestão de praça, não de sorte.',
+      ...pensadorA('territorio', f.nome + ':6'),
     });
   }
 
@@ -287,9 +354,7 @@ function planoDaFabrica(f) {
         + 'clientes por motivos que não dependem de você — mudança de dono, fechamento, '
         + 'reposicionamento. Sem entrada nova, a curva só tem um caminho. '
         + 'O vazio de prospecção de hoje é a queda de faturamento daqui a seis meses.',
-      autor: 'Jeb Blount',
-      frase: null,
-      contexto: 'Fanatical Prospecting: prospecção é atividade diária, não campanha de emergência.',
+      ...pensadorA('prospeccao', f.nome + ':7'),
     });
   }
 
@@ -301,9 +366,7 @@ function planoDaFabrica(f) {
       texto: 'Se uma dessas lojas parar, a fábrica inteira despenca na sua carteira. '
         + 'Concentração assim não é força de relacionamento, é fragilidade estrutural. '
         + 'Vale abrir pelo menos duas lojas novas antes que a decisão seja tomada por você.',
-      autor: 'Aaron Ross',
-      frase: null,
-      contexto: 'Predictable Revenue: receita previsível vem de processo de entrada, não de poucos grandes contratos.',
+      ...pensadorA('concentracao', f.nome + ':8'),
     });
   }
 
@@ -315,9 +378,7 @@ function planoDaFabrica(f) {
       texto: 'Quando a fábrica pressiona por volume, o caminho curto é desconto — e desconto '
         + 'come a comissão antes de comer a margem da fábrica. O caminho longo é mix: '
         + 'mais itens no mesmo pedido, com o mesmo frete e a mesma visita.',
-      autor: 'Thiago Concer',
-      frase: null,
-      contexto: 'Princípio recorrente: desconto é a saída de quem não construiu valor antes.',
+      ...pensadorA('desconto', f.nome + ':9'),
     });
   }
 
@@ -328,9 +389,7 @@ function planoDaFabrica(f) {
     texto: 'O lojista não decide sozinho pelo catálogo: decide pela confiança em quem atende. '
       + 'Numa representação, sua vantagem sobre a fábrica que vende direto é justamente estar '
       + 'na loja, conhecer a vitrine e saber o que encalhou.',
-    autor: 'Jeffrey Gitomer',
-    frase: '"As pessoas não gostam que vendam para elas, mas adoram comprar."',
-    contexto: 'Complementado por Dale Carnegie: interesse sincero pelo negócio do outro abre mais portas que técnica.',
+    ...pensadorA('eloHumano', f.nome + ':10'),
   });
 
   return acoes;
