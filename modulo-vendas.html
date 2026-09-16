@@ -286,55 +286,77 @@ function hashSemente(s) {
   for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
 }
+/* pool: filtra por tier quando informado (severidade real do numero), com
+ * fallback pra lista toda se o tier nao existir no tema ou ficar vazio. */
+function poolPensadores(tema, tier) {
+  const banco = PENSADORES[tema];
+  if (!tier) return banco;
+  const filtrado = banco.filter((p) => !p.tier || p.tier === tier);
+  return filtrado.length ? filtrado : banco;
+}
 const PENSADORES = {
   diagnostico: [
-    { autor: 'Jack Welch', frase: '"Encare a realidade como ela é, não como você gostaria que fosse."', contexto: 'GE. Diagnóstico honesto antes de qualquer plano de ação.' },
-    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: sem entender onde a receita realmente nasce, toda decisão de gestão vira palpite.' },
-    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: antes de cobrar um indicador, perguntar o que a equipe faria diferente por causa dele.' },
-    { autor: 'Flávio Augusto', frase: null, contexto: 'Geração de Valor: encarar o problema de frente custa caro no curto prazo e compensa no longo prazo.' },
+    { autor: 'Jack Welch', frase: '"Encare a realidade como ela é, não como você gostaria que fosse."', contexto: 'GE. Diagnóstico honesto antes de qualquer plano de ação.', tier: 'alta' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: a metáfora do dinossauro do livro é a empresa que protege o passado em vez de se replanejar — quanto maior a queda, mais urgente admitir que o modelo antigo parou de funcionar.', tier: 'alta' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: antes de cobrar um indicador, perguntar o que a equipe faria diferente por causa dele — diagnóstico sem pergunta de ação vira só estatística.', tier: 'media' },
+    { autor: 'Flávio Augusto', frase: null, contexto: 'Geração de Valor: encarar o problema de frente custa caro no curto prazo e compensa no longo prazo.', tier: 'media' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'Princípios da Alta Performance: o CHA (conhecimento, habilidade, atitude) começa pelo diagnóstico do que está faltando, não pela desculpa.', tier: 'leve' },
+    { autor: 'Jack Welch', frase: null, contexto: 'GE: para ele, falta de franqueza sobre número fraco era o problema mais comum e mais escondido dentro das empresas.', tier: 'leve' },
   ],
   carteiraExistente: [
-    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: crescer dentro da carteira que já se tem é o caminho mais barato de crescimento.' },
-    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: positivar carteira sem cuidar do mix esconde quem parou de comprar atrás de quem comprou pouco.' },
-    { autor: 'Jeffrey Gitomer', frase: null, contexto: 'Little Red Book of Selling: manter atenção em quem já compra rende mais que sempre perseguir cliente novo.' },
-    { autor: 'Zig Ziglar', frase: null, contexto: 'Princípio recorrente: cliente não compra de quem não confia mais — recuperar começa por reconstruir confiança, não desconto.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: crescer dentro da carteira que já se tem é o caminho mais barato de crescimento — quanto mais nomes pararam, mais dinheiro está parado dentro de casa.', tier: 'alta' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'Chega de Desconto!: pirâmide de sustentação do valor — cliente que parou geralmente não foi embora pelo preço, foi embora por outro degrau da pirâmide que faltou.', tier: 'alta' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: positivar carteira sem cuidar do mix esconde quem parou de comprar atrás de quem comprou pouco.', tier: 'media' },
+    { autor: 'Jeffrey Gitomer', frase: null, contexto: 'Little Red Book of Selling: manter atenção em quem já compra rende mais que sempre perseguir cliente novo.', tier: 'media' },
+    { autor: 'Zig Ziglar', frase: null, contexto: 'See You at the Top: a escada dele começa pelo relacionamento — recuperar quem parou é, antes de tudo, reconstruir uma relação que esfriou.', tier: 'leve' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'Princípios da Alta Performance: dentro do CHA, atitude é ir atrás de quem sumiu antes que o concorrente vá.', tier: 'leve' },
   ],
   perguntar: [
     { autor: 'Neil Rackham', frase: null, contexto: 'SPIN Selling: em venda complexa, quem investiga com perguntas vende mais que quem argumenta.' },
+    { autor: 'Neil Rackham', frase: null, contexto: 'SPIN Selling: a pesquisa da Huthwaite por trás do livro mostrou que os vendedores mais eficazes eram os que mais perguntavam na etapa de investigação, não os que mais falavam.' },
     { autor: 'Thiago Concer', frase: null, contexto: 'Vendas não ocorrem por acaso: pergunta é a ferramenta mais poderosa porque o cliente compra pelas razões dele, não pelas do vendedor.' },
     { autor: 'Dale Carnegie', frase: null, contexto: 'Como Fazer Amigos: perguntar com interesse genuíno sobre o negócio do outro abre mais portas que qualquer argumento pronto.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: '8 passos da venda: levantamento de necessidades vem antes da apresentação — pular essa etapa é apresentar solução pra um problema que não foi confirmado.' },
   ],
   ensinar: [
-    { autor: 'Matthew Dixon e Brent Adamson', frase: null, contexto: 'The Challenger Sale: quem ensina, adapta o discurso ao cliente e assume o controle da conversa costuma vender mais.' },
+    { autor: 'Matthew Dixon e Brent Adamson', frase: null, contexto: 'The Challenger Sale: quem ensina, adapta o discurso ao cliente e assume o controle da conversa costuma vender mais (teach, tailor, take control).' },
+    { autor: 'Matthew Dixon e Brent Adamson', frase: null, contexto: 'The Challenger Sale: pesquisa com mais de 6 mil vendedores mostrou o perfil Challenger na frente do perfil só-relacionamento em venda complexa.' },
     { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: oportunidade parada é pipeline vazio disfarçado de sorte ruim.' },
     { autor: 'Sandro Magaldi', frase: null, contexto: 'Vendas 3.0: o vendedor precisa se reposicionar de tirador de pedido para quem enxerga a oportunidade que o cliente ainda não viu.' },
     { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: oportunidade previsível nasce de processo de entrada estruturado, não de lembrança de contato antigo.' },
   ],
   medirRepetir: [
     { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: medir existe para descobrir o que funcionou e repetir, não para decorar número.' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'GEC (Gestão de Equipes Comerciais): indicador só vale se muda a atitude de quem olha pra ele no dia seguinte.' },
     { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: elite de vendas acompanha os próprios números como atleta de alto rendimento acompanha estatística.' },
     { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: acompanhar de perto é o que revela, com dado, onde o crescimento é real.' },
-    { autor: 'John H. Patterson', frase: null, contexto: 'NCR: o clube dos que batiam a cota existia para separar, com número, quem performa de quem só está ocupado.' },
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR: o clube dos que batiam a cota existia pra separar, com número, quem performa de quem só está ocupado.' },
   ],
   territorio: [
-    { autor: 'John H. Patterson', frase: null, contexto: 'NCR, fim do século 19: vender é gestão de praça — território, cota e roteiro de visita, não sorte.' },
-    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: pipeline cheio depende de manter o roteiro ativo mesmo quando a carteira parece resolvida.' },
-    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: praça em queda costuma aparecer primeiro na frequência de visita, antes de aparecer no faturamento.' },
-    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: praça sem processo de cobertura repete o erro clássico de esperar o cliente aparecer sozinho.' },
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR, fim do século 19: vender é gestão de praça — território, cota e roteiro de visita, não sorte.', tier: 'alta' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: praça inteira em queda raramente é acaso de vários lojistas ao mesmo tempo — geralmente é sinal de concorrente novo ou ruptura de entrega.', tier: 'alta' },
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: pipeline cheio depende de manter o roteiro ativo mesmo quando a carteira parece resolvida.', tier: 'media' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: praça sem processo de cobertura repete o erro clássico de esperar o cliente aparecer sozinho.', tier: 'media' },
+    { autor: 'Raul Candeloro', frase: null, contexto: '8 passos da venda: cobertura de praça é o primeiro passo — sem visita não existe diagnóstico nem oportunidade.', tier: 'leve' },
+    { autor: 'John H. Patterson', frase: null, contexto: 'NCR: criou o Hundred Point Club pra premiar quem batia a cota — o que se media e se comparava, se repetia.', tier: 'leve' },
   ],
   prospeccao: [
     { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: prospecção é atividade diária, não campanha de emergência quando o funil esvazia.' },
+    { autor: 'Jeb Blount', frase: null, contexto: 'Fanatical Prospecting: a lei do universo da prospecção — nada acontece até alguém vender alguma coisa; sem entrada nova, o resto da engrenagem para.' },
     { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: depender de indicação e contato antigo é o erro clássico que tira o gestor de vendas do cargo.' },
     { autor: 'John H. Patterson', frase: null, contexto: 'NCR: território sem prospecção vira território apenas administrado, nunca conquistado de novo.' },
   ],
   concentracao: [
-    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: receita previsível vem de processo de entrada constante, não de poucos contratos grandes.' },
-    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: carteira concentrada em poucos nomes é indicador de risco antes de ser indicador de sucesso.' },
-    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: negócio que não gera negócio novo não se resolve cortando custo, se resolve diversificando fonte de receita.' },
-    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: proteger poucos clientes grandes sem cultivar os médios é a forma mais comum de fragilizar a carteira.' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: receita previsível vem de processo de entrada constante, não de poucos contratos grandes — com uma ou duas lojas sustentando tudo, não sobra margem de erro.', tier: 'alta' },
+    { autor: 'Sandro Magaldi', frase: null, contexto: 'Gestão do Amanhã: negócio que não gera negócio novo não se resolve cortando custo, se resolve diversificando fonte de receita.', tier: 'alta' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'VendaMais: carteira concentrada em poucos nomes é indicador de risco antes de ser indicador de sucesso.', tier: 'media' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: proteger poucos clientes grandes sem cultivar os médios é a forma mais comum de fragilizar a carteira.', tier: 'media' },
+    { autor: 'Aaron Ross', frase: null, contexto: 'Predictable Revenue: mesmo carteira relativamente diversificada precisa de funil de entrada constante pra não virar concentração no ano seguinte.', tier: 'leve' },
+    { autor: 'Raul Candeloro', frase: null, contexto: 'Curva ABC de clientes: útil pra enxergar concentração, mas perigosa se vira desculpa pra parar de abrir conta nova.', tier: 'leve' },
   ],
   desconto: [
     { autor: 'Thiago Concer', frase: null, contexto: 'Vendas não ocorrem por acaso: desconto é a saída de quem não construiu valor antes de falar preço.' },
+    { autor: 'Marcelo Caetano', frase: null, contexto: 'Chega de Desconto!: ser agressivo na forma de vender, não no preço — a pirâmide de valor existe pra dar outros motivos de compra além do desconto.' },
     { autor: 'Jeffrey Gitomer', frase: null, contexto: 'Little Red Book of Selling: quem vende ideia não depende de preço; quem só fala preço já ficou sem argumento.' },
     { autor: 'Marcelo Caetano', frase: null, contexto: 'Chega de Desconto!: desconto dado sem critério vira expectativa do cliente e hábito da equipe, difícil de reverter depois.' },
     { autor: 'Sandro Magaldi', frase: null, contexto: 'Vendas 3.0: reposicionar a venda em valor, não em preço, separa o vendedor consultor do tirador de pedido.' },
@@ -342,18 +364,19 @@ const PENSADORES = {
   eloHumano: [
     { autor: 'Jeffrey Gitomer', frase: '"As pessoas não gostam que vendam para elas, mas adoram comprar."', contexto: 'Little Red Book of Selling. Complementado por Dale Carnegie: interesse sincero pelo negócio do outro abre mais portas que técnica.' },
     { autor: 'Dale Carnegie', frase: null, contexto: 'Como Fazer Amigos e Influenciar Pessoas: interesse genuíno pelo negócio do outro abre mais portas em dois meses do que tentar ser interessante em dois anos.' },
-    { autor: 'Zig Ziglar', frase: null, contexto: 'Princípio recorrente: se o cliente gosta de você ele escuta, se confia ele compra — a venda nasce da confiança antes da técnica.' },
+    { autor: 'Zig Ziglar', frase: null, contexto: 'See You at the Top: a escada dele começa pela autoimagem e pelo relacionamento com o outro, antes de metas e atitude — vender é consequência disso, não o contrário.' },
     { autor: 'Marcelo Caetano', frase: null, contexto: 'VendaMais: vendedor fiel gera cliente fiel — o vínculo humano sustenta a recompra muito depois do argumento técnico ser esquecido.' },
+    { autor: 'Zig Ziglar', frase: null, contexto: 'Princípio central do autor: ajudar o outro a conseguir o que ele quer é o que garante, no fim, conseguir o que você quer.' },
   ],
 };
-function pensadorA(tema, semente) {
-  const banco = PENSADORES[tema];
-  const p = banco[hashSemente(String(semente)) % banco.length];
+function pensadorA(tema, semente, tier) {
+  const pool = poolPensadores(tema, tier);
+  const p = pool[hashSemente(String(semente)) % pool.length];
   return { autor: p.autor, frase: p.frase, contexto: p.contexto };
 }
-function pensadorB(tema, semente) {
-  const banco = PENSADORES[tema];
-  const p = banco[hashSemente(String(semente) + ':b') % banco.length];
+function pensadorB(tema, semente, tier) {
+  const pool = poolPensadores(tema, tier);
+  const p = pool[hashSemente(String(semente) + ':b') % pool.length];
   return { autor: p.autor, frase: p.frase, ctx: p.contexto };
 }
 
@@ -378,7 +401,7 @@ function planoDaFabrica(f) {
         + `identifique <b>onde exatamente</b> o dinheiro sumiu: são `
         + `${perdidos.length} loja(s) que pararam e ${quedas.length} que reduziram forte. `
         + `Isso dá ${fmtMoney(perdaReais)} de perda rastreável. O resto é hipótese.`,
-      ...pensadorA('diagnostico', f.nome + ':1'),
+      ...pensadorA('diagnostico', f.nome + ':1', (f.tendencia === 'parou' || (f.variacao != null && f.variacao <= -40)) ? 'alta' : (f.variacao != null && f.variacao <= -15) ? 'media' : 'leve'),
     });
   }
 
@@ -391,7 +414,7 @@ function planoDaFabrica(f) {
       texto: `Maiores: ${esc(top)}. Estas lojas já conheciam o produto, já tinham `
         + `mostruário e já tinham vendido. Recuperar cliente que parou custa uma fração `
         + `de abrir cliente novo — e a conversa começa de um lugar melhor: "sumiu por quê?".`,
-      ...pensadorA('carteiraExistente', f.nome + ':2'),
+      ...pensadorA('carteiraExistente', f.nome + ':2', perdidos.length >= 5 ? 'alta' : perdidos.length >= 2 ? 'media' : 'leve'),
     });
   }
 
@@ -446,7 +469,7 @@ function planoDaFabrica(f) {
         + `${c.perdidos.length} loja(s) pararam nesta praça. Uma cidade inteira caindo raramente `
         + 'é coincidência de lojistas — costuma ser concorrente novo, ruptura de entrega ou '
         + 'mostruário envelhecido. Vá até lá com hipótese, não com planilha.',
-      ...pensadorA('territorio', f.nome + ':6'),
+      ...pensadorA('territorio', f.nome + ':6', (c.perdidos.length >= 3 || (c.total12ant && c.total12 / c.total12ant <= 0.6)) ? 'alta' : (c.total12ant && c.total12 / c.total12ant <= 0.85) ? 'media' : 'leve'),
     });
   }
 
@@ -471,7 +494,7 @@ function planoDaFabrica(f) {
       texto: 'Se uma dessas lojas parar, a fábrica inteira despenca na sua carteira. '
         + 'Concentração assim não é força de relacionamento, é fragilidade estrutural. '
         + 'Vale abrir pelo menos duas lojas novas antes que a decisão seja tomada por você.',
-      ...pensadorA('concentracao', f.nome + ':8'),
+      ...pensadorA('concentracao', f.nome + ':8', f.clientes12 === 1 ? 'alta' : f.clientes12 === 2 ? 'media' : 'leve'),
     });
   }
 
@@ -903,7 +926,7 @@ function renderResumo(m) {
       x: `Você está <b class="up">+${varAno}%</b> sobre o ano passado e <b class="down">${Math.round((1 - m.tendencia / m.objetivoMes) * 100)}% abaixo</b> da média de ${m.anos.length} anos. `
         + `Não é contradição: ${Math.min(...m.anos)}–${Math.max(...m.anos)} inclui anos melhores que o último. `
         + 'Crescer sobre o ano mais fraco não significa ter voltado ao normal.',
-      ...pensadorB('diagnostico', selo + ':1'),
+      ...pensadorB('diagnostico', selo + ':1', (m.tendencia <= m.objetivoMes * 0.7) ? 'alta' : (m.tendencia <= m.objetivoMes * 0.85) ? 'media' : 'leve'),
     });
   }
 
@@ -917,7 +940,7 @@ function renderResumo(m) {
         + (porUtil <= (m.acumulado / comMovimento) * 1.1
           ? 'O ritmo por dia trabalhado já está no ponto — o que falta é ocupar os dias vazios.'
           : 'Além de ocupar os dias vazios, cada dia precisa render mais do que vem rendendo.'),
-      ...pensadorB('territorio', selo + ':2'),
+      ...pensadorB('territorio', selo + ':2', (semMovimento / m.corridos >= 0.5) ? 'alta' : (semMovimento / m.corridos >= 0.25) ? 'media' : 'leve'),
     });
   }
 
@@ -935,7 +958,7 @@ function renderResumo(m) {
         + (esgotadas.length
           ? `E ${esgotadas.map((e) => esc(e.nome)).join(', ')} já está praticamente no teto da própria média — não tem de onde crescer neste mês.`
           : 'Vale confirmar pedido em carteira antes de contar com elas.'),
-      ...pensadorB('concentracao', selo + ':3'),
+      ...pensadorB('concentracao', selo + ':3', pctTop >= 85 ? 'alta' : pctTop >= 75 ? 'media' : 'leve'),
     });
   }
 
@@ -948,7 +971,7 @@ function renderResumo(m) {
         + `(${Math.round((maior.feito / maior.alvo) * 100)}%). Isso não é oscilação, é ausência. `
         + 'Antes de atribuir a mercado ou preço, abra esta fábrica no módulo e veja <b>quais lojas</b> '
         + 'compravam neste mês e não compraram. A perda é rastreável loja a loja; o resto é hipótese.',
-      ...pensadorB('diagnostico', selo + ':4'),
+      ...pensadorB('diagnostico', selo + ':4', (maior.feito <= maior.alvo * 0.1) ? 'alta' : (maior.feito <= maior.alvo * 0.25) ? 'media' : 'leve'),
     });
   }
 
@@ -961,7 +984,7 @@ function renderResumo(m) {
       x: `${zeradas.map((z) => `${esc(z.nome)} (${fmtCurto(z.alvo)})`).join(' · ')} — ${fmtMoney(soma)} de média somada. `
         + `Só ${esc(zeradas[0].nome)} vale ${fmtMoney(zeradas[0].alvo)}. `
         + 'Reativar quem já comprou custa menos que qualquer prospecção nova, e é a maior alavanca disponível na segunda quinzena.',
-      ...pensadorB('carteiraExistente', selo + ':5'),
+      ...pensadorB('carteiraExistente', selo + ':5', zeradas.length >= 4 ? 'alta' : zeradas.length >= 2 ? 'media' : 'leve'),
     });
   }
 
