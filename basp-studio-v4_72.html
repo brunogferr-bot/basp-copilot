@@ -750,7 +750,7 @@ tr:hover td{background:var(--glass-bg-hover)}
           <div class="token-dot" id="token-dot"></div>
           <div>
             <div class="token-text">Token Meta ativo</div>
-            <div class="token-date">Renova 09/08/2026</div>
+            <div class="token-date">Testado e funcionando em 14/10/2026</div>
           </div>
         </div>
         <button class="logout-btn" id="logout-btn">Sair</button>
@@ -1417,7 +1417,7 @@ tr:hover td{background:var(--glass-bg-hover)}
                   <button class="btn btn-gold btn-sm" style="width:100%;margin-top:14px" id="btn-save-settings">Salvar conexão</button>
                   <button class="btn btn-glass btn-sm" style="width:100%;margin-top:8px" id="btn-test-server">Testar conexão com o servidor</button>
                   <div id="server-status-note" style="display:none;margin-top:8px"></div>
-                  <div class="settings-note" style="margin-top:12px">O token Meta fica configurado no painel do seu servidor (Render, Railway etc.) — nunca neste arquivo. Renovação prevista: <strong>09/08/2026</strong>.</div>
+                  <div class="settings-note" style="margin-top:12px">O token Meta fica configurado no painel do seu servidor (Render, Railway etc.) — nunca neste arquivo. Último teste: <strong>funcionando em 14/10/2026</strong> (passou de 09/08 sem vencer).</div>
                 </div>
               </div>
 
@@ -3241,7 +3241,7 @@ function renderPublishChecklist(){
     { id:"chk-seo",       txt:"A legenda tem palavras-chave do setor (ex: design de interiores, poltrona, MG/GO/DF) — SEO supera hashtag em 2026?" },
     { id:"chk-saves",     txt:"O conteúdo vale um \"salvar\" ou um envio por DM para um amigo arquiteto/designer?" },
     { id:"chk-original",  txt:"As imagens/vídeos são originais (não repost). Conteúdo original recebe +40–60% de alcance." },
-    { id:"chk-token",     txt:"Token Meta válido (não vence até 09/08/2026)." },
+    { id:"chk-token",     txt:"Token Meta válido (testado em 14/10/2026)." },
   ];
 
   // itens específicos por formato
@@ -7270,58 +7270,96 @@ function renderPostsStatus(){
   const tendencias = loadPostsTendencias();
   const fila = loadPostsFila();
   document.getElementById("posts-stat-garimpo").textContent = tendencias.length + " tendências/dia";
-  document.getElementById("posts-stat-geracao").textContent = fila.length + " roteiro(s) na fila";
+  document.getElementById("posts-stat-geracao").textContent = postsFilaServidor.length + " post(s) aguardando aprovação";
   document.getElementById("posts-stat-publicacao").textContent = postsConfig.postsPerDay + " posts/dia";
 }
 
-/* renderiza a tabela de fila de aprovação */
-function renderPostsFila(){
+/* renderiza a tabela de fila de aprovação
+   v4_73: a fila agora vem do servidor do Garimpo (Airtable "Tendencias Virais"),
+   a MESMA que o @Basp_aprova_bot usa no Telegram. Aprovar aqui publica de verdade. */
+let postsFilaServidor = [];
+let postsFilaErro = "";
+async function carregarFilaServidor(){
+  try{
+    const res = await fetch(GARIMPO_SERVER_URL + "/api/fila/aprovacao", { signal: AbortSignal.timeout(60000) });
+    const data = await res.json();
+    postsFilaServidor = (data.posts || []).map(p => ({
+      id: p.id, tema: p.tema || "", copy: p.copy || "",
+      score: Number(p.score) || 0, status: p.status || ""
+    }));
+    postsFilaErro = "";
+  }catch(e){
+    postsFilaErro = "Servidor do Garimpo não respondeu (ele pode estar acordando — tente de novo em 1 minuto).";
+  }
+}
+function escFila(t){
+  return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+async function renderPostsFila(recarregar = true){
   const tbody = document.getElementById("posts-fila-table-body");
   const empty = document.getElementById("posts-fila-empty");
   if(!tbody) return;
-  const fila = loadPostsFila();
+  if(recarregar){
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px">Buscando a fila no servidor…</td></tr>';
+    empty.style.display = "none";
+    await carregarFilaServidor();
+  }
+  const fila = postsFilaServidor;
   tbody.innerHTML = "";
+  const stat = document.getElementById("posts-stat-geracao");
+  if(stat) stat.textContent = fila.length + " post(s) aguardando aprovação";
 
+  if(postsFilaErro){
+    empty.textContent = postsFilaErro;
+    empty.style.display = "block";
+    return;
+  }
   if(fila.length === 0){
+    empty.textContent = "Nenhum post aguardando aprovação. Rode o garimpo para gerar novas tendências.";
     empty.style.display = "block";
     return;
   }
   empty.style.display = "none";
 
-  fila.forEach((item, idx)=>{
+  fila.forEach(item=>{
     const tr = document.createElement("tr");
     tr.innerHTML =
-      '<td>' + item.nicho + '</td>' +
-      '<td style="max-width:280px">' + item.gancho + '</td>' +
-      '<td style="color:var(--text-muted);font-size:11px">' + item.fonte + '</td>' +
+      '<td>' + escFila(item.status) + '</td>' +
+      '<td style="max-width:280px"><b>' + escFila(item.tema.replace(/^FOTO PROPRIA:\s*/i,"")) + '</b><br><span style="font-size:11px;color:var(--text-muted)">' + escFila(item.copy.slice(0,160)) + '</span></td>' +
+      '<td style="color:var(--text-muted);font-size:11px">Garimpo / Telegram</td>' +
       '<td><span class="badge badge-pendente">' + item.score.toFixed(2) + '</span></td>' +
-      '<td><span class="badge badge-' + item.status + '">' + statusLabel(item.status) + '</span></td>' +
-      '<td style="white-space:nowrap"><button class="btn btn-glass btn-sm posts-aprovar" data-idx="' + idx + '" style="font-size:10px;padding:4px 8px">✓ Aprovar</button> <button class="btn btn-glass btn-sm posts-rejeitar" data-idx="' + idx + '" style="font-size:10px;padding:4px 8px;color:rgba(200,80,80,0.9)">✕</button></td>';
+      '<td><span class="badge badge-pendente">Aguardando você</span></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-glass btn-sm posts-aprovar" data-id="' + item.id + '" data-tipo="imagem" style="font-size:10px;padding:4px 8px">✓ Post</button> ' +
+        '<button class="btn btn-glass btn-sm posts-aprovar" data-id="' + item.id + '" data-tipo="reels" style="font-size:10px;padding:4px 8px">✓ Reels</button> ' +
+        '<button class="btn btn-glass btn-sm posts-aprovar" data-id="' + item.id + '" data-tipo="story" style="font-size:10px;padding:4px 8px">✓ Story</button>' +
+      '</td>';
     tbody.appendChild(tr);
   });
 
   document.querySelectorAll(".posts-aprovar").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const list = loadPostsFila();
-      const i = parseInt(btn.dataset.idx, 10);
-      if(list[i]){
-        list[i].status = "agendado";
-        savePostsFila(list);
-        renderPostsFila();
-        renderPostsStatus();
-        toast("Roteiro aprovado e enviado para a fila de publicação.", "success");
+    btn.addEventListener("click", async ()=>{
+      const rotulo = {imagem:"post", reels:"reels", story:"story"}[btn.dataset.tipo];
+      if(!confirm("Publicar este conteúdo como " + rotulo + " no Instagram agora?")) return;
+      document.querySelectorAll(".posts-aprovar").forEach(b=> b.disabled = true);
+      btn.textContent = "Publicando…";
+      try{
+        const res = await fetch(GARIMPO_SERVER_URL + "/api/post/publicar-aprovado", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recordId: btn.dataset.id, tipo: btn.dataset.tipo }),
+          signal: AbortSignal.timeout(180000)
+        });
+        const data = await res.json().catch(()=>({}));
+        if(res.ok && data.success !== false){
+          toast("Publicado no Instagram como " + rotulo + ".", "success");
+        }else{
+          toast("Não publicou: " + (data.error || ("erro " + res.status)), "error");
+        }
+      }catch(e){
+        toast("Não publicou: o servidor demorou demais para responder.", "error");
       }
-    });
-  });
-  document.querySelectorAll(".posts-rejeitar").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const list = loadPostsFila();
-      const i = parseInt(btn.dataset.idx, 10);
-      list.splice(i, 1);
-      savePostsFila(list);
-      renderPostsFila();
-      renderPostsStatus();
-      toast("Roteiro descartado.");
+      renderPostsFila(true);
     });
   });
 }
