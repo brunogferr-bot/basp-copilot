@@ -2618,7 +2618,7 @@ function loadFactoryIntel(factory){
 function saveFactoryIntel(factory, intel){ localStorage.setItem("basp_intel_"+factory, JSON.stringify(intel)); }
 
 /* funções de perfil e credenciais — definidas cedo para estarem disponíveis na inicialização */
-function loadCredentials(){ try{ return JSON.parse(localStorage.getItem("basp_credentials"))||{user:"bruno",pass:"basp2024"}; }catch(e){ return {user:"bruno",pass:"basp2024"}; } }
+function loadCredentials(){ try{ return JSON.parse(localStorage.getItem("basp_credentials"))||{user:"bruno",pass:""}; }catch(e){ return {user:"bruno",pass:""}; } }
 function saveCredentials(obj){ localStorage.setItem("basp_credentials", JSON.stringify(obj)); }
 function loadPerfil(){ try{ return JSON.parse(localStorage.getItem("basp_perfil"))||{}; }catch(e){ return {}; } }
 function savePerfil(obj){ localStorage.setItem("basp_perfil", JSON.stringify(obj)); }
@@ -2781,12 +2781,22 @@ function playWelcomeAnimation(){
   }, 2050);
 }
 
-function checkAuth(){
-  if(sessionStorage.getItem("basp_auth") === "1"){
-    document.getElementById("login-screen").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    initApp();
-  }
+/* v4_73: no copilot.basp.com.br quem autentica e o Cloudflare Access (e-mail + codigo).
+   No arquivo local (file://) o PC do Bruno ja e o controle de acesso.
+   Por isso nao ha mais senha padrao escrita neste arquivo publico. */
+function entrarDireto(){
+  sessionStorage.setItem("basp_auth","1");
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  initApp();
+}
+async function checkAuth(){
+  if(sessionStorage.getItem("basp_auth") === "1"){ entrarDireto(); return; }
+  if(location.protocol === "file:"){ entrarDireto(); return; }
+  try{
+    const r = await fetch("/cdn-cgi/access/get-identity", {credentials:"include", cache:"no-store", signal: AbortSignal.timeout(8000)});
+    if(r.ok){ const d = await r.json(); if(d && d.email){ entrarDireto(); return; } }
+  }catch(e){}
 }
 
 document.getElementById("login-form").addEventListener("submit", (e)=>{
@@ -2795,8 +2805,8 @@ document.getElementById("login-form").addEventListener("submit", (e)=>{
   const pass = document.getElementById("login-pass").value;
   const errEl = document.getElementById("login-error");
   // usa credenciais salvas pelo usuario, ou o padrao do sistema
-  const creds = (()=>{ try{ return JSON.parse(localStorage.getItem("basp_credentials")) || {user:"bruno",pass:"basp2024"}; }catch(e){ return {user:"bruno",pass:"basp2024"}; } })();
-  if(user === creds.user && pass === creds.pass){
+  const creds = (()=>{ try{ return JSON.parse(localStorage.getItem("basp_credentials")) || null; }catch(e){ return null; } })();
+  if(creds && user === creds.user && pass === creds.pass){
     sessionStorage.setItem("basp_auth","1");
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app").style.display = "block";
